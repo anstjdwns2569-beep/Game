@@ -38,7 +38,8 @@
   }
   #app {
     position: relative; height: 100%; max-width: 520px; margin: 0 auto;
-    display: flex; flex-direction: column; background: var(--navy); overflow: hidden;
+    display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: 100%;
+    background: var(--navy); overflow: hidden;
   }
   button { font: inherit; color: inherit; cursor: pointer; }
   button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
@@ -58,12 +59,12 @@
   .hud-stats b { color: var(--ink); font-size: 15px; }
   .hud-stats .late b { color: var(--bad); }
 
-  .stage { position: relative; flex: 1 1 auto; min-height: 220px; }
+  .stage { position: relative; min-height: 0; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
   /* ---- VMT (vehicle mounted terminal) ---- */
   .vmt {
-    flex: 0 0 auto; max-height: 47%; overflow-y: auto;
+    max-height: 40vh; max-height: 40dvh; overflow-y: auto;
     background: var(--vmt); border-top: 2px solid #000; font-family: var(--mono);
     padding-block: 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
     padding-left: max(12px, env(safe-area-inset-left, 0px));
@@ -103,6 +104,39 @@
   .gauge-bar { position: relative; height: 10px; border-radius: 5px; background: linear-gradient(90deg, rgba(255,107,94,.45), rgba(111,220,156,.35) 38%, rgba(111,220,156,.35) 62%, rgba(255,107,94,.45)); }
   .gauge-bar i { position: absolute; top: -3px; width: 3px; height: 16px; background: var(--ink); border-radius: 2px; transform: translateX(-50%); }
   .gauge-bar em { position: absolute; top: -2px; bottom: -2px; border-left: 1px dashed rgba(255,255,255,.5); }
+
+  /* ---- landscape: cab view on the left, VMT on the right ---- */
+  @media (orientation: landscape) and (min-width: 560px) {
+    #app { max-width: 1280px; grid-template-columns: minmax(0, 1fr) minmax(270px, 36%); grid-template-rows: auto minmax(0, 1fr); }
+    .hud { grid-column: 1 / -1; }
+    .vmt { max-height: none; border-top: 0; border-left: 2px solid #000; align-content: start; }
+  }
+
+  /* ---- on-screen controller ---- */
+  .pad {
+    position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px;
+    padding-bottom: 10px;
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+    pointer-events: none;
+  }
+  .pad > * { pointer-events: auto; }
+  .pad-grp { display: grid; gap: 5px; justify-items: center; }
+  .pad-grp .keys { display: flex; gap: 6px; }
+  .pad-r .keys { flex-direction: column; }
+  .pad-grp span { font: 600 9.5px var(--mono); color: #fff; text-shadow: 0 1px 3px #000; letter-spacing: .08em; }
+  .pbtn {
+    width: 54px; height: 54px; border-radius: 10px; border: 1px solid rgba(255,255,255,.28);
+    background: rgba(12,16,22,.66); color: #fff; font-size: 18px; touch-action: none;
+  }
+  .pbtn.on { background: rgba(255,181,71,.6); color: #1a1205; }
+  .lockbtn {
+    min-width: 100px; height: 62px; border-radius: 31px; border: 2px solid rgba(255,255,255,.3);
+    background: rgba(12,16,22,.72); color: var(--dim); font: 400 19px var(--display); line-height: 1.05; touch-action: none;
+  }
+  .lockbtn small { display: block; font: 600 9.5px var(--mono); letter-spacing: .06em; }
+  .lockbtn.ready { background: var(--good); color: #0b1a10; border-color: transparent; }
+  .lockbtn.release { background: var(--amber); color: #1a1205; border-color: transparent; }
 
   /* ---- full screens (home / result) ---- */
   .screen {
@@ -174,7 +208,14 @@
       <span>점수 <b id="hud-score">100</b></span>
     </div>
   </header>
-  <div class="stage" id="stage"><canvas id="c" aria-label="크레인 운전석에서 내려다본 작업 화면. 열을 눌러 컨테이너를 집고 내려놓습니다."></canvas></div>
+  <div class="stage" id="stage">
+    <canvas id="c" aria-label="크레인 운전석에서 내려다본 작업 화면"></canvas>
+    <div class="pad" id="pad" hidden>
+      <div class="pad-grp pad-l"><div class="keys"><button class="pbtn" type="button" data-k="left" aria-label="트롤리 왼쪽">◀</button><button class="pbtn" type="button" data-k="right" aria-label="트롤리 오른쪽">▶</button></div><span>TROLLEY</span></div>
+      <button class="lockbtn" id="lockbtn" type="button">잠금<small>LOCK</small></button>
+      <div class="pad-grp pad-r"><div class="keys"><button class="pbtn" type="button" data-k="up" aria-label="호이스트 올리기">▲</button><button class="pbtn" type="button" data-k="down" aria-label="호이스트 내리기">▼</button></div><span>HOIST</span></div>
+    </div>
+  </div>
   <section class="vmt" id="vmt" aria-live="polite"></section>
 
   <div class="screen" id="home">
@@ -206,6 +247,13 @@
         <button class="diff" type="button" data-diff="hard">고수</button>
       </div>
       <p class="diff-desc" id="diff-desc"></p>
+
+      <div class="section-label">조작 방식</div>
+      <div class="diffs" role="group" aria-label="조작 방식" style="grid-template-columns: 1fr 1fr">
+        <button class="diff" type="button" data-ctrl="pad">컨트롤러</button>
+        <button class="diff" type="button" data-ctrl="tap">탭</button>
+      </div>
+      <p class="diff-desc" id="ctrl-desc" style="min-height: 0"></p>
       <div class="best" id="home-best"></div>
       <button class="cta" id="go" type="button">운전 시작</button>
 
@@ -216,6 +264,7 @@
           <dt>이적 (Shifting)</dt><dd>꺼낼 컨테이너 위에 쌓인 컨테이너를 다른 열로 옮기는 작업.</dd>
           <dt>재취급 (Rehandling)</dt><dd>한 번 옮긴 컨테이너를 또 옮겨야 하는 상황. 장비 시간과 비용이 늘어납니다.</dd>
           <dt>야드 위치 A03-15-04-2</dt><dd>블록 A03, 베이 15, 열(Row) 04, 단(Tier) 2. 단은 바닥이 1단입니다.</dd>
+          <dt>트롤리 · 호이스트 · 스프레더</dt><dd>트롤리는 크레인 빔을 따라 좌우로 움직이는 대차, 호이스트는 컨테이너를 올리고 내리는 장치, 스프레더는 컨테이너 네 모서리에 트위스트락을 꽂아 잡는 장치입니다.</dd>
           <dt>STS (안벽 크레인)</dt><dd>부두에서 선박으로 컨테이너를 싣고 내리는 크레인.</dd>
           <dt>POD (양하항)</dt><dd>컨테이너를 내릴 항구. 먼저 들르는 항구의 컨테이너가 위에 있어야 합니다.</dd>
           <dt>Overstow</dt><dd>나중에 내릴 컨테이너가 먼저 내릴 컨테이너 위에 실린 상태. 중간 항구에서 내렸다 다시 실어야(restow) 합니다.</dd>
@@ -253,7 +302,7 @@
     normal: { rows: 6, tiers: 4, orders: 3, fill: 0.62, hintTarget: true,  hintPlace: false, waitLimit: 0,
               desc: '6열 4단 야드, 반출 3건. 꺼낼 컨테이너만 표시됩니다. 다음 오더를 보고 이적 위치를 직접 판단하세요.' },
     hard:   { rows: 6, tiers: 5, orders: 4, fill: 0.66, hintTarget: false, hintPlace: false, waitLimit: 45,
-              desc: '6열 5단 야드, 반출 4건. 화면 표시 없이 VMT 위치 정보만 보고 작업합니다. 트럭이 45초 넘게 기다리면 감점.' },
+              desc: '6열 5단 야드, 반출 4건. 화면 표시 없이 VMT 위치 정보만 보고 작업합니다. 트럭 대기 제한(탭 45초, 컨트롤러 90초).' },
   };
   const SHIP = {
     easy:   { rows: 5, tiers: 3, count: 10, pods: 2, weights: false, reefer: false, heelLimit: 0,
@@ -262,6 +311,16 @@
               desc: '6열 4단, 16개 선적. 양하항 3곳에 무게까지 고려합니다. 무거운 컨테이너는 아래로.' },
     hard:   { rows: 6, tiers: 4, count: 20, pods: 3, weights: true,  reefer: true,  heelLimit: 2,
               desc: '6열 4단, 20개 선적. 냉동 컨테이너는 플러그 열에만, 작업 종료 시 횡경사 2° 이내여야 합니다.' },
+  };
+  // Manual (controller) handling: alignment tolerance, trolley responsiveness, collision penalty.
+  const MAN = {
+    easy:   { tol: 8,   accel: 14, coll: false },
+    normal: { tol: 6,   accel: 11, coll: true },
+    hard:   { tol: 3.5, accel: 6,  coll: true },
+  };
+  const CTRL_DESC = {
+    pad: '트롤리(◀ ▶)와 호이스트(▲ ▼)를 직접 움직이고, 스프레더가 컨테이너에 착지·정렬되면 잠금/해제를 누릅니다. 키보드(방향키 + 스페이스)와 게임패드도 쓸 수 있어요.',
+    tap: '열을 누르면 크레인이 자동으로 이동해 집고 내려놓습니다. 작업 순서를 먼저 익힐 때 좋아요.',
   };
   const PORTS = [
     { code: 'SHA', name: '상하이', color: '#f2b23a' },
@@ -277,6 +336,7 @@
     overstow:    { name: 'Overstow', tip: '먼저 들르는 항구(POD)의 컨테이너가 위에 있어야 합니다. 반대로 실으면 중간 항구에서 내렸다 다시 싣는 restow 비용이 생깁니다.' },
     weight:      { name: '중량 역적재', tip: '무거운 컨테이너는 아래에 둡니다. 위가 무거우면 무게중심이 높아지고 래싱(고박)에 무리가 갑니다.' },
     reefer:      { name: '리퍼 슬롯 위반', tip: '냉동 컨테이너(22R1)는 전원 플러그가 있는 열에 실어야 온도를 유지할 수 있습니다.' },
+    collision:   { name: '충돌 경고', tip: '트롤리를 옮길 때는 호이스트를 충분히 올려 다른 컨테이너에 부딪히지 않게 하세요. 실제로는 컨테이너 손상과 안전사고로 이어집니다.' },
     heel:        { name: '횡경사 초과', tip: '한쪽에 무게가 쏠리면 배가 기울어 하역과 운항이 위험합니다. 좌현·우현에 번갈아 실어 균형을 맞추세요.' },
   };
 
@@ -326,10 +386,12 @@
 
   // ================= state =================
   const cvs = $('c'), ctx = cvs.getContext('2d');
-  let scale = 1, LH = 500, L = null, G = null;
+  let scale = 1, LH = 500, L = null, G = null, ox = 0, VX0 = 0, VW = LW;
+  const held = { left: false, right: false, up: false, down: false };
+  let lockQueued = false, gpPrevA = false;
   const crane = { x: 0, q: [], carrying: null, wait: 0 };
   const truck = { off: 0, state: 'idle', box: null, cb: null };
-  let sel = { game: store.get('edu-game') === 'ship' ? 'ship' : 'yard', diff: ['easy', 'normal', 'hard'].includes(store.get('edu-diff')) ? store.get('edu-diff') : 'easy' };
+  let sel = { game: store.get('edu-game') === 'ship' ? 'ship' : 'yard', diff: ['easy', 'normal', 'hard'].includes(store.get('edu-diff')) ? store.get('edu-diff') : 'easy', ctrl: store.get('edu-ctrl') === 'tap' ? 'tap' : 'pad' };
   const bestKey = (g, d) => `edu-best-${g}-${d}`;
 
   // ================= layout =================
@@ -338,8 +400,10 @@
     const w = cvs.clientWidth, h = cvs.clientHeight;
     if (!w || !h) return;
     cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr);
-    scale = w / LW; LH = h / scale;
-    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
+    // Fit the 360-wide work area; extra width (landscape) widens the view around it.
+    scale = Math.min(w / LW, h / 400); LH = h / scale;
+    VW = w / scale; ox = (VW - LW) / 2; VX0 = -ox;
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * scale * ox, 0);
     if (G) computeLayout();
   }
   function computeLayout() {
@@ -356,7 +420,7 @@
       laneX = margin + colW * 0.5;
       for (let r = 0; r < R; r++) rowX.push(margin + gap + colW * (r + 1.5));
     }
-    L = { colW, cw, cl, rowX, laneX, bayY: LH * 0.47, bayGap: cl + 66, margin, gap };
+    L = { colW, cw, cl, rowX, laneX, bayY: LH * (G.manual ? 0.42 : 0.47), bayGap: cl + 66, margin, gap };
     if (!crane.q.length) crane.x = crane.carrying ? crane.x : laneX;
   }
   function hitCol(x) {
@@ -381,13 +445,18 @@
     const kind = sel.game, diff = sel.diff;
     const cfg = (kind === 'yard' ? YARD : SHIP)[diff];
     G = { kind, diff, cfg, R: cfg.rows, T: cfg.tiers, score: 100, pen: [], moves: 0, t0: now(), floats: [], done: false,
-          msg: '', msgKind: 'info' };
+          msg: '', msgKind: 'info', manual: sel.ctrl === 'pad' };
+    G.m = { hb: cfg.tiers + 1.7, vx: 0, vh: 0, landed: false, aligned: null, colliding: false };
     crane.q = []; crane.carrying = null;
+    $('pad').hidden = !G.manual;
     if (kind === 'yard') setupYard(); else setupShip();
     $('home').hidden = true; $('result').hidden = true;
     resize(); computeLayout(); crane.x = L.laneX;
     $('hud-title').innerHTML = `${kind === 'yard' ? '야드 이적·반출' : '본선 선적'}<small>${{ easy: '초보', normal: '중수', hard: '고수' }[diff]}</small>`;
     $('hud-time-label').textContent = kind === 'yard' ? '트럭 대기' : '경과';
+    if (G.manual) say(G.kind === 'yard'
+      ? '◀ ▶로 트롤리를 대상 열 위에 맞추고 ▼로 내려 착지하면 잠금을 누르세요. 옮길 때는 ▲로 충분히 올리세요.'
+      : '트롤리를 트럭 위로 옮겨 ▼로 내리고 잠금, ▲로 올려 실을 열로 옮긴 뒤 내려서 해제하세요.', 'info');
     renderVMT(); updateHud();
   }
 
@@ -454,27 +523,34 @@
     if (col === 'lane') {
       if (!crane.carrying) { const p = findBox(tgt); say(`먼저 반출 대상을 집으세요. 위치 ${yardLoc(p.r, p.i)} (${pad2(p.r + 1)}열 ${p.i + 1}단).`, 'info'); return; }
       if (crane.carrying !== tgt) { say('이 컨테이너는 반출 대상이 아닙니다. 다른 열에 내려놓으세요.', 'bad'); buzz(20); return; }
-      go(L.laneX, () => { truck.box = crane.carrying; crane.carrying = null; gateOut(); });
+      go(L.laneX, doYardGate);
       return;
     }
     const r = col, st = G.stacks[r];
     if (!crane.carrying) {
       if (!st.length) { say(`${pad2(r + 1)}열은 비어 있습니다.`, 'info'); return; }
-      go(L.rowX[r], () => {
-        crane.carrying = st.pop(); G.src = r; G.srcBlocking = st.includes(tgt);
-        if (crane.carrying === tgt) say('반출 대상을 집었습니다. 오른쪽 트럭 차선을 눌러 상차하세요.', 'good');
-        else if (G.srcBlocking) say('반출 대상 위의 컨테이너를 집었습니다. 다음 반출 예정이 없는 열에 이적하세요.', 'info');
-        else say('이 열에는 반출 대상이 없습니다. 같은 열을 다시 누르면 제자리에 내려놓습니다.', 'bad');
-        renderVMT();
-      });
+      go(L.rowX[r], () => doYardPick(r));
       return;
     }
-    if (r === G.src) {
-      go(L.rowX[r], () => { st.push(crane.carrying); crane.carrying = null; say('제자리에 내려놓았습니다.', 'info'); renderVMT(); });
-      return;
-    }
+    if (r === G.src) { go(L.rowX[r], () => doYardPutBack(r)); return; }
     if (st.length >= G.T) { say(`${pad2(r + 1)}열은 최대 ${G.T}단으로 꽉 찼습니다.`, 'bad'); buzz(20); return; }
-    go(L.rowX[r], () => {
+    go(L.rowX[r], () => doYardPlace(r));
+  }
+
+  function doYardGate() { truck.box = crane.carrying; crane.carrying = null; gateOut(); }
+  function doYardPick(r) {
+    const st = G.stacks[r], tgt = curTarget();
+    crane.carrying = st.pop(); G.src = r; G.srcBlocking = st.includes(tgt);
+    const lane = G.manual ? '트럭 위로 옮겨 내린 뒤 해제하세요' : '오른쪽 트럭 차선을 눌러 상차하세요';
+    if (crane.carrying === tgt) say(`반출 대상을 집었습니다. ${lane}.`, 'good');
+    else if (G.srcBlocking) say('반출 대상 위의 컨테이너를 집었습니다. 다음 반출 예정이 없는 열에 이적하세요.', 'info');
+    else say(`이 열에는 반출 대상이 없습니다. ${G.manual ? '같은 열에 다시 내려놓으면' : '같은 열을 다시 누르면'} 감점 없이 제자리로 돌아갑니다.`, 'bad');
+    renderVMT();
+  }
+  function doYardPutBack(r) { G.stacks[r].push(crane.carrying); crane.carrying = null; say('제자리에 내려놓았습니다.', 'info'); renderVMT(); }
+  function doYardPlace(r) {
+    const st = G.stacks[r], tgt = curTarget();
+    {
       const b = crane.carrying; crane.carrying = null; G.moves++;
       let bad = false;
       if (b === tgt || !G.srcBlocking) { penalize('unneeded', 5, r); bad = true; }
@@ -486,13 +562,14 @@
       const p = findBox(tgt);
       if (p && p.above === 0) say(G.msg + ' 이제 반출 대상이 맨 위에 있습니다.', G.msgKind);
       renderVMT();
-    });
+    }
   }
 
+  const waitLimit = () => G.cfg.waitLimit * (G.manual ? 2 : 1);
   function gateOut() {
     const o = G.orders[G.oi];
     o.done = true; o.wait = (now() - G.truckT0) / 1000;
-    if (G.cfg.waitLimit && o.wait > G.cfg.waitLimit) penalize('wait', 10, 'lane');
+    if (waitLimit() && o.wait > waitLimit()) penalize('wait', 10, 'lane');
     say(`반출 완료. ${o.truck} 트럭 출발 (대기 ${fmtTime(o.wait)}).`, 'good');
     float('lane', '반출', 'good'); buzz(15);
     renderVMT();
@@ -521,12 +598,17 @@
     if (col === 'lane') { say('트럭 위 컨테이너를 실을 선박의 열(Row)을 누르세요.', 'info'); return; }
     const r = col, st = G.stacks[r];
     if (st.length >= G.T) { say(`${G.labels[r]}열은 최대 ${G.T}단으로 꽉 찼습니다.`, 'bad'); buzz(20); return; }
-    go(L.laneX, () => {
-      crane.carrying = G.queue.shift(); truck.box = null;
-      truckMove('out', () => { if (G.queue.length) truckArrive(G.queue[0], () => renderVMT()); });
-      renderVMT();
-    });
-    go(L.rowX[r], () => {
+    go(L.laneX, doShipPick);
+    go(L.rowX[r], () => doShipPlace(r));
+  }
+  function doShipPick() {
+    crane.carrying = G.queue.shift(); truck.box = null;
+    truckMove('out', () => { if (G.queue.length) truckArrive(G.queue[0], () => renderVMT()); });
+    renderVMT();
+  }
+  function doShipPlace(r) {
+    const st = G.stacks[r];
+    {
       const b = crane.carrying; crane.carrying = null;
       const below = st[st.length - 1];
       let bad = false;
@@ -549,7 +631,112 @@
       if (!bad) { say(`${PORTS[b.pod].name}행 ${b.no}, 13-${G.labels[r]}-${82 + (st.length - 1) * 2} 적재 완료.`, 'good'); float(r, '적재', 'good'); }
       if (!G.queue.length) finish();
       renderVMT();
-    });
+    }
+  }
+
+  // ================= manual (controller) operation =================
+  const HMAX = () => G.T + 1.7;
+  function columns() { const a = G.stacks.map((s, r) => ({ col: r, x: L.rowX[r] })); a.push({ col: 'lane', x: L.laneX }); return a; }
+  function colHeight(col) {
+    if (col === 'lane') return Math.abs(truck.off) < 1 && !(G.kind === 'yard' && G.done) ? (truck.box ? 1.45 : 0.45) : 0;
+    return G.stacks[col].length;
+  }
+  function obstacleAt(x) { let h = 0; for (const c of columns()) if (Math.abs(x - c.x) < L.cw * 0.96) h = Math.max(h, colHeight(c.col)); return h; }
+  function alignedCol(x) { for (const c of columns()) if (Math.abs(x - c.x) <= MAN[G.diff].tol) return c.col; return null; }
+  const colX = (col) => (col === 'lane' ? L.laneX : L.rowX[col]);
+
+  function readGamepad() {
+    try {
+      const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (const gp of gps) {
+        if (!gp) continue;
+        const dz = (v) => (Math.abs(v || 0) < 0.2 ? 0 : v);
+        const btn = (i) => gp.buttons[i] && gp.buttons[i].pressed;
+        let ax = dz(gp.axes[0]), ay = dz(gp.axes[3]) || dz(gp.axes[1]);
+        if (btn(14)) ax = -1; if (btn(15)) ax = 1; if (btn(12)) ay = -1; if (btn(13)) ay = 1;
+        const a = btn(0);
+        if (a && !gpPrevA) lockQueued = true;
+        gpPrevA = a;
+        return { ax, ay };
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function manualUpdate(dt) {
+    const m = G.m, cfg = MAN[G.diff];
+    let ax = (held.right ? 1 : 0) - (held.left ? 1 : 0), ay = (held.down ? 1 : 0) - (held.up ? 1 : 0);
+    const gp = readGamepad();
+    if (gp) { if (gp.ax) ax = gp.ax; if (gp.ay) ay = gp.ay; }
+    if (G.done) { ax = 0; ay = 0; }
+    m.vx += (ax * 150 - m.vx) * Math.min(1, dt * cfg.accel);
+    m.vh += (-ay * 2.4 - m.vh) * Math.min(1, dt * 12);
+    // trolley travel, blocked if the load would hit a taller stack
+    const xs = columns().map((c) => c.x);
+    const nx = Math.max(Math.min(...xs) - L.colW * 0.45, Math.min(Math.max(...xs) + L.colW * 0.45, crane.x + m.vx * dt));
+    if (Math.abs(nx - crane.x) > 1e-4) {
+      const bottom = m.hb - (crane.carrying ? 1 : 0);
+      if (bottom < obstacleAt(nx) - 0.02) {
+        m.vx = 0;
+        if (!m.colliding) {
+          m.colliding = true; buzz(60);
+          let near = 0; columns().forEach((c) => { if (Math.abs(nx - c.x) < Math.abs(nx - colX(near))) near = c.col; });
+          if (cfg.coll) penalize('collision', 2, near);
+          say('충돌 위험! 호이스트를 올린 뒤 트롤리를 옮기세요.', 'bad');
+        }
+      } else { crane.x = nx; m.colliding = false; }
+    }
+    // hoist, stopping on whatever is below the spreader
+    const floor = obstacleAt(crane.x) + (crane.carrying ? 1 : 0);
+    m.hb = Math.min(HMAX(), Math.max(floor, m.hb + m.vh * dt));
+    if (m.hb <= floor + 1e-3 && m.vh < 0) m.vh = 0;
+    m.landed = m.hb <= floor + 0.02;
+    m.aligned = alignedCol(crane.x);
+    if (lockQueued) { lockQueued = false; manualLock(); }
+    updateLockBtn();
+  }
+
+  function manualLock() {
+    const m = G.m;
+    if (G.done) return;
+    if (!m.landed) { say('스프레더가 컨테이너에 닿을 때까지 호이스트를 내리세요.', 'info'); return; }
+    const col = m.aligned;
+    if (col == null) { say('정렬 불량: 트롤리를 열 중앙에 맞춘 뒤 다시 내리세요.', 'bad'); buzz(20); return; }
+    crane.x = colX(col); // twistlocks guide the spreader into the corner castings
+    const full = col !== 'lane' && G.stacks[col].length >= G.T;
+    if (G.kind === 'yard') {
+      if (!crane.carrying) {
+        if (col === 'lane') { say('트럭은 비어 있습니다. 반출 대상을 집어 오세요.', 'info'); return; }
+        if (!G.stacks[col].length) { say('바닥입니다. 집을 컨테이너가 없어요.', 'info'); return; }
+        doYardPick(col);
+      } else if (col === 'lane') {
+        if (colHeight('lane') === 0) { say('트럭이 아직 도착하지 않았습니다.', 'info'); return; }
+        if (crane.carrying !== curTarget()) { say('이 컨테이너는 반출 대상이 아닙니다. 다른 열에 내려놓으세요.', 'bad'); buzz(20); return; }
+        doYardGate();
+      } else if (col === G.src) doYardPutBack(col);
+      else if (full) { say(`${pad2(col + 1)}열은 최대 ${G.T}단입니다. 더 쌓을 수 없어요.`, 'bad'); return; }
+      else doYardPlace(col);
+    } else {
+      if (!crane.carrying) {
+        if (col !== 'lane') { say('선박에 실은 컨테이너는 다시 집지 않습니다. 트럭 위 컨테이너를 집으세요.', 'info'); return; }
+        if (!truck.box || Math.abs(truck.off) > 1) { say('트럭이 아직 도착하지 않았습니다.', 'info'); return; }
+        doShipPick();
+      } else if (col === 'lane') { say('트럭에 다시 내려놓지 않습니다. 선박의 열에 실으세요.', 'info'); return; }
+      else if (full) { say(`${G.labels[col]}열은 최대 ${G.T}단입니다.`, 'bad'); return; }
+      else doShipPlace(col);
+    }
+    buzz(12);
+  }
+
+  function updateLockBtn() {
+    const b = $('lockbtn'), m = G.m;
+    let cls = '', sub;
+    if (!m.landed) sub = '착지 전';
+    else if (m.aligned == null) sub = '정렬 불량';
+    else { sub = crane.carrying ? 'UNLOCK' : 'LOCK'; cls = crane.carrying ? ' release' : ' ready'; }
+    const html = `${crane.carrying ? '해제' : '잠금'}<small>${sub}</small>`;
+    if (b.dataset.h !== html) { b.innerHTML = html; b.dataset.h = html; }
+    if (b.className !== 'lockbtn' + cls) b.className = 'lockbtn' + cls;
   }
 
   // ================= finish / result =================
@@ -735,7 +922,7 @@
   }
 
   function drawYard() {
-    ctx.fillStyle = '#5f6369'; ctx.fillRect(0, 0, LW, LH);
+    ctx.fillStyle = '#5f6369'; ctx.fillRect(VX0, 0, VW, LH);
     // lane
     const lx = L.laneX - L.colW / 2 - 4, lw = L.colW + 8;
     ctx.fillStyle = '#54585e'; ctx.fillRect(lx, 0, lw, LH);
@@ -758,12 +945,12 @@
   }
 
   function drawShip() {
-    ctx.fillStyle = '#1d4558'; ctx.fillRect(0, 0, LW, LH);
+    ctx.fillStyle = '#1d4558'; ctx.fillRect(VX0, 0, VW, LH);
     ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1;
-    for (let y = 8; y < LH; y += 22) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(LW, y + 6); ctx.stroke(); }
+    for (let y = 8; y < LH; y += 22) { ctx.beginPath(); ctx.moveTo(VX0, y); ctx.lineTo(VX0 + VW, y + 6); ctx.stroke(); }
     // quay apron with truck lane
     const qx = L.laneX + L.colW / 2 + 5;
-    ctx.fillStyle = '#9a9c9e'; ctx.fillRect(0, 0, qx, LH);
+    ctx.fillStyle = '#9a9c9e'; ctx.fillRect(VX0, 0, qx - VX0, LH);
     ctx.fillStyle = '#86898c'; ctx.fillRect(L.laneX - L.colW / 2 - 2, 0, L.colW + 4, LH);
     ctx.fillStyle = '#e7c13d'; ctx.fillRect(L.laneX - L.colW / 2 - 2, 0, 2, LH);
     ctx.fillStyle = '#2b2d30'; ctx.fillRect(qx - 3, 0, 3, LH);
@@ -800,7 +987,7 @@
     const yard = G.kind === 'yard';
     const top = L.bayY - L.cl / 2 - 20, bot = L.bayY + L.cl / 2 + 20;
     const col = yard ? '#efb52e' : '#5f93bf', dark = yard ? '#a87a12' : '#3c6688';
-    const x0 = 0, x1 = LW;
+    const x0 = yard ? 0 : VX0, x1 = yard ? LW : VX0 + VW;
     for (const gy of [top, bot]) {
       ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x0 + 4, gy + 4, x1 - x0, 9);
       ctx.fillStyle = col; ctx.fillRect(x0, gy - 4, x1 - x0, 9);
@@ -826,7 +1013,8 @@
     ctx.fillStyle = '#2b3448'; ctx.fillRect(tx + L.cw / 2 + 2, top - 10, 13, 17);
     ctx.fillStyle = '#9fd0ff'; ctx.fillRect(tx + L.cw / 2 + 4, top - 2, 9, 5);
     // spreader / carried box
-    if (crane.carrying) {
+    if (G.manual) drawManualSpreader(tx);
+    else if (crane.carrying) {
       const s = 1.2;
       ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(tx - L.cw * s / 2 + 12, L.bayY - L.cl * s / 2 + 15, L.cw * s, L.cl * s);
       roof(tx, L.bayY, L.cw * s, L.cl * s, crane.carrying);
@@ -841,6 +1029,38 @@
       ctx.fillStyle = '#ffd34d';
       for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) ctx.fillRect(tx + dx * L.cw / 2 - 3, L.bayY + dy * L.cl / 2 - 3, 6, 6);
     }
+  }
+
+  // Spreader drawn at its hoist height: higher means closer to the cab, so larger and nudged up-left.
+  function geomH(x, h) { const s = 1 + 0.045 * h; return { x: x - h * 1.5, y: L.bayY - h * 2, w: L.cw * s, l: L.cl * s }; }
+  function drawManualSpreader(tx) {
+    const m = G.m, obs = obstacleAt(tx);
+    const bottom = m.hb - (crane.carrying ? 1 : 0), drop = Math.max(0, bottom - obs);
+    const gs = geomH(tx, obs - 1);
+    ctx.fillStyle = `rgba(0,0,0,${0.16 + 0.2 / (1 + drop)})`;
+    ctx.fillRect(gs.x - gs.w / 2 + drop * 5, gs.y - gs.l / 2 + drop * 6, gs.w, gs.l);
+    const g = geomH(tx, m.hb - 1);
+    if (crane.carrying) roof(g.x, g.y, g.w, g.l, crane.carrying);
+    const col = m.landed ? (m.aligned != null ? '#6fdc9c' : '#ff6b5e') : '#ffd34d';
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5;
+    ctx.strokeRect(g.x - g.w / 2 - 1, g.y - g.l / 2 - 1, g.w + 2, g.l + 2);
+    ctx.beginPath(); ctx.moveTo(g.x - g.w / 2, g.y); ctx.lineTo(g.x + g.w / 2, g.y); ctx.stroke();
+    ctx.lineWidth = 1; ctx.fillStyle = col;
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) ctx.fillRect(g.x + dx * g.w / 2 - 3.5, g.y + dy * g.l / 2 - 3.5, 7, 7);
+    // alignment guide: ticks over the column the spreader is lined up with
+    if (m.aligned != null && !m.landed) {
+      const cx = colX(m.aligned);
+      ctx.fillStyle = 'rgba(111,220,156,.9)';
+      ctx.fillRect(cx - 1, L.bayY - L.cl / 2 - 14, 2, 8); ctx.fillRect(cx - 1, L.bayY + L.cl / 2 + 6, 2, 8);
+    }
+    // hoist height gauge
+    const gx = VX0 + VW - 26, gy = 10, gh = Math.min(120, LH * 0.3), unit = gh / HMAX();
+    ctx.fillStyle = 'rgba(12,16,22,.75)'; ctx.fillRect(gx - 4, gy - 4, 26, gh + 20);
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(gx, gy + gh - obs * unit, 8, obs * unit);
+    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = '600 7px "IBM Plex Mono", ui-monospace, monospace';
+    for (let t = 0; t <= G.T; t++) { ctx.fillRect(gx, gy + gh - t * unit, 10, 1); if (t) ctx.fillText(t, gx + 12, gy + gh - t * unit + 2.5); }
+    ctx.fillStyle = col; ctx.fillRect(gx - 2, gy + gh - bottom * unit - 1.5, 14, 3);
+    ctx.fillStyle = '#fff'; ctx.fillText('HOIST', gx - 2, gy + gh + 11);
   }
 
   function draw() {
@@ -903,6 +1123,7 @@
       if (Math.abs(d) > sp) truck.off += Math.sign(d) * sp;
       else { truck.off = goal; truck.state = 'idle'; const cb = truck.cb; truck.cb = null; cb && cb(); }
     }
+    if (G.manual && $('home').hidden && $('result').hidden) manualUpdate(dt);
     for (const f of G.floats) f.life -= dt * 0.8;
     G.floats = G.floats.filter((f) => f.life > 0);
     // HUD clock
@@ -910,7 +1131,7 @@
       const s = G.kind === 'yard' ? (now() - G.truckT0) / 1000 : (now() - G.t0) / 1000;
       const txt = fmtTime(s);
       if ($('hud-time').textContent !== txt) $('hud-time').textContent = txt;
-      $('hud-time-wrap').classList.toggle('late', G.kind === 'yard' && !!G.cfg.waitLimit && s > G.cfg.waitLimit);
+      $('hud-time-wrap').classList.toggle('late', G.kind === 'yard' && !!waitLimit() && s > waitLimit());
     }
   }
   let last = now();
@@ -922,16 +1143,35 @@
 
   // ================= input =================
   function tap(col) {
-    if (!G || G.done || busy() || col == null) return;
+    if (!G || G.manual || G.done || busy() || col == null) return;
     if (G.kind === 'yard') yardTap(col); else shipTap(col);
   }
   cvs.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     const r = cvs.getBoundingClientRect();
-    tap(hitCol((e.clientX - r.left) / scale));
+    tap(hitCol((e.clientX - r.left) / scale - ox));
   });
+  const KEYMAP = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right',
+                   ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down' };
+  addEventListener('keyup', (e) => { if (KEYMAP[e.key]) held[KEYMAP[e.key]] = false; });
+  addEventListener('blur', () => { for (const k in held) held[k] = false; });
+  for (const b of document.querySelectorAll('.pbtn')) {
+    const k = b.dataset.k;
+    const on = (e) => { e.preventDefault(); held[k] = true; b.classList.add('on'); try { b.setPointerCapture(e.pointerId); } catch (err) {} };
+    const off = () => { held[k] = false; b.classList.remove('on'); };
+    b.addEventListener('pointerdown', on);
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, off);
+    b.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  $('lockbtn').addEventListener('pointerdown', (e) => { e.preventDefault(); lockQueued = true; });
+  $('lockbtn').addEventListener('click', (e) => { if (e.detail === 0) lockQueued = true; }); // keyboard activation
   addEventListener('keydown', (e) => {
     if (!G || !$('home').hidden || !$('result').hidden) return;
+    if (G.manual) {
+      if (KEYMAP[e.key]) { held[KEYMAP[e.key]] = true; e.preventDefault(); }
+      else if ((e.code === 'Space' || e.key === 'Enter') && !e.repeat) { lockQueued = true; e.preventDefault(); }
+      return;
+    }
     const n = parseInt(e.key, 10);
     if (n >= 1 && n <= G.R) tap(n - 1);
     else if (e.key === 't' || e.key === 'T' || e.key === '0') tap('lane');
@@ -941,13 +1181,16 @@
   // ================= home screen =================
   function renderHome() {
     for (const b of document.querySelectorAll('.mode')) b.setAttribute('aria-pressed', String(b.dataset.game === sel.game));
-    for (const b of document.querySelectorAll('.diff')) b.setAttribute('aria-pressed', String(b.dataset.diff === sel.diff));
+    for (const b of document.querySelectorAll('[data-diff]')) b.setAttribute('aria-pressed', String(b.dataset.diff === sel.diff));
+    for (const b of document.querySelectorAll('[data-ctrl]')) b.setAttribute('aria-pressed', String(b.dataset.ctrl === sel.ctrl));
+    $('ctrl-desc').textContent = CTRL_DESC[sel.ctrl];
     $('diff-desc').textContent = (sel.game === 'yard' ? YARD : SHIP)[sel.diff].desc;
     const best = store.get(bestKey(sel.game, sel.diff));
     $('home-best').innerHTML = best ? `이 작업·난이도 최고 점수 <b>${best}점</b>` : '아직 기록이 없습니다.';
   }
   for (const b of document.querySelectorAll('.mode')) b.addEventListener('click', () => { sel.game = b.dataset.game; store.set('edu-game', sel.game); renderHome(); });
-  for (const b of document.querySelectorAll('.diff')) b.addEventListener('click', () => { sel.diff = b.dataset.diff; store.set('edu-diff', sel.diff); renderHome(); });
+  for (const b of document.querySelectorAll('[data-diff]')) b.addEventListener('click', () => { sel.diff = b.dataset.diff; store.set('edu-diff', sel.diff); renderHome(); });
+  for (const b of document.querySelectorAll('[data-ctrl]')) b.addEventListener('click', () => { sel.ctrl = b.dataset.ctrl; store.set('edu-ctrl', sel.ctrl); renderHome(); });
   $('go').addEventListener('click', startGame);
   $('again').addEventListener('click', startGame);
   const goHome = () => { $('result').hidden = true; $('home').hidden = false; renderHome(); };
