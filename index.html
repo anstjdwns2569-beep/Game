@@ -52,6 +52,11 @@
     padding-right: max(12px, env(safe-area-inset-right, 0px));
     background: var(--navy); border-bottom: 1px solid var(--line);
   }
+  .music-btn { background: none; border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
+  .music-btn[aria-pressed="false"] { color: var(--dim); text-decoration: line-through; }
+  .hud .music-btn { font-size: 15px; padding: 3px 10px; }
+  @media (max-width: 400px) { #hud-time-label { display: none; } }
+  .home-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .hud-back { background: none; border: 1px solid var(--line); border-radius: 4px; padding: 5px 9px; font-size: 12px; }
   .hud-title { flex: 1; min-width: 0; font: 400 17px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hud-title small { font: 600 11px var(--body); color: var(--dim); margin-left: 6px; }
@@ -208,6 +213,7 @@
       <span id="hud-time-wrap"><span id="hud-time-label">트럭 대기</span> <b id="hud-time">00:00</b></span>
       <span>점수 <b id="hud-score">100</b></span>
     </div>
+    <button class="music-btn" type="button" aria-label="배경음악 켜기/끄기">♪ 음악</button>
   </header>
   <div class="stage" id="stage">
     <canvas id="c" aria-label="크레인 운전석에서 내려다본 작업 화면"></canvas>
@@ -221,7 +227,7 @@
 
   <div class="screen" id="home">
     <div class="wrap">
-      <div class="eyebrow">TGIU · Crane training</div>
+      <div class="home-top"><div class="eyebrow">TGIU · Crane training</div><button class="music-btn" type="button" aria-label="배경음악 켜기/끄기">♪ 음악</button></div>
       <h1><span>TGIU</span> 크레인 실습</h1>
       <p class="lead">크레인 운전석에서 내려다보며 컨테이너를 다룹니다. 야드에서 반출할 컨테이너를 이적해 꺼내고, 부두에서 본선에 선적해 보세요.</p>
 
@@ -384,6 +390,79 @@
   const yardLoc = (r, i) => `A03-15-${pad2(r + 1)}-${i + 1}`;
 
   const buzz = (ms) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+
+  // ================= background music =================
+  // Original bouncy claw-machine style loop, synthesised live (no audio files).
+  // 8 bars of 8th notes: lead melody (midi numbers, null = rest) over a root/octave/fifth bass.
+  const MELODY = [
+    76, 79, 84, 79, 76, 79, 84, null,   74, 77, 81, 77, 74, 77, 81, null,
+    76, 79, 84, 88, 86, 84, 81, 79,     77, 81, 79, 76, 74, null, 72, null,
+    81, 84, 81, 79, 76, 79, 81, null,   79, 76, 74, 76, 79, null, null, null,
+    84, 83, 81, 79, 81, 83, 84, 86,     88, 84, 79, 76, 72, null, null, null,
+  ];
+  const BASS_ROOTS = [48, 50, 48, 43, 45, 52, 41, 48]; // C Dm C G Am Em F C
+  const BASS_STEPS = [0, 12, 7, 12, 0, 12, 7, 12];
+  const music = { on: store_get('edu-music') !== '0', ac: null, out: null, noise: null, step: 0, next: 0, timer: null };
+  function store_get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function tone(midi, t, dur, type, vol) {
+    const ac = music.ac, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = 440 * 2 ** ((midi - 69) / 12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(music.out); o.start(t); o.stop(t + dur + 0.03);
+  }
+  function hat(t) {
+    const ac = music.ac, src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = music.noise; f.type = 'highpass'; f.frequency.value = 7000;
+    g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+    src.connect(f).connect(g).connect(music.out); src.start(t); src.stop(t + 0.05);
+  }
+  function playStep(i, t, len) {
+    const m = MELODY[i];
+    if (m != null) { tone(m, t, len * 0.85, 'square', 0.05); tone(m + 12, t, len * 1.6, 'sine', 0.025); }
+    tone(BASS_ROOTS[i >> 3] + BASS_STEPS[i & 7], t, len * 0.8, 'triangle', 0.13);
+    if (i & 1) hat(t);
+  }
+  function schedule() {
+    const len = 60 / 140 / 2; // 140 BPM, 8th notes
+    while (music.next < music.ac.currentTime + 0.15) {
+      playStep(music.step, music.next, len);
+      music.step = (music.step + 1) % MELODY.length;
+      music.next += len;
+    }
+  }
+  function musicStart() {
+    if (!music.on || document.hidden) return;
+    try {
+      if (!music.ac) {
+        music.ac = new (window.AudioContext || window.webkitAudioContext)();
+        music.out = music.ac.createGain(); music.out.gain.value = 0.5; music.out.connect(music.ac.destination);
+        music.noise = music.ac.createBuffer(1, music.ac.sampleRate * 0.1, music.ac.sampleRate);
+        const d = music.noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      if (music.ac.state === 'suspended') music.ac.resume();
+      if (!music.timer) { music.next = music.ac.currentTime + 0.05; music.timer = setInterval(schedule, 25); }
+    } catch (e) {}
+  }
+  function musicStop() {
+    clearInterval(music.timer); music.timer = null;
+    try { if (music.ac) music.ac.suspend(); } catch (e) {}
+  }
+  function renderMusicBtns() {
+    for (const b of document.querySelectorAll('.music-btn')) { b.setAttribute('aria-pressed', String(music.on)); b.textContent = b.closest('.hud') ? '♪' : music.on ? '♪ 음악 켬' : '♪ 음악 끔'; }
+  }
+  for (const b of document.querySelectorAll('.music-btn')) b.addEventListener('click', () => {
+    music.on = !music.on;
+    try { localStorage.setItem('edu-music', music.on ? '1' : '0'); } catch (e) {}
+    music.on ? musicStart() : musicStop();
+    renderMusicBtns();
+  });
+  // Browsers only allow sound after the first tap or key press.
+  addEventListener('pointerdown', musicStart, true);
+  addEventListener('keydown', musicStart, true);
+  document.addEventListener('visibilitychange', () => { document.hidden ? musicStop() : musicStart(); });
+  renderMusicBtns();
 
   // ================= state =================
   const cvs = $('c'), ctx = cvs.getContext('2d');
