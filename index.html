@@ -128,14 +128,26 @@
   }
   .pad > * { pointer-events: auto; }
   .pad-grp { display: grid; gap: 5px; justify-items: center; }
-  .pad-grp .keys { display: flex; gap: 6px; }
-  .pad-r .keys { flex-direction: column; }
   .pad-grp span { font: 600 9.5px var(--mono); color: #fff; text-shadow: 0 1px 3px #000; letter-spacing: .08em; }
-  .pbtn {
-    width: 54px; height: 54px; border-radius: 10px; border: 1px solid rgba(255,255,255,.28);
-    background: rgba(12,16,22,.66); color: #fff; font-size: 18px; touch-action: none;
+  /* Joysticks are gated levers like a crane cab: left one only slides sideways, right one only up/down. */
+  .stick {
+    position: relative; display: flex; align-items: center; justify-content: space-between;
+    background: rgba(12,16,22,.62); border: 1px solid rgba(255,255,255,.25); border-radius: 36px; touch-action: none;
   }
-  .pbtn.on { background: rgba(255,181,71,.6); color: #1a1205; }
+  .stick-x { width: 136px; height: 64px; padding: 0 10px; }
+  .stick-y { width: 64px; height: 136px; flex-direction: column; padding: 10px 0; }
+  .stick::before { content: ""; position: absolute; background: rgba(0,0,0,.5); border-radius: 3px; }
+  .stick-x::before { left: 24px; right: 24px; top: 50%; height: 6px; margin-top: -3px; }
+  .stick-y::before { top: 24px; bottom: 24px; left: 50%; width: 6px; margin-left: -3px; }
+  .stick i { font-style: normal; font-size: 10px; color: rgba(255,255,255,.5); pointer-events: none; }
+  .knob {
+    position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ff7a6e, var(--red) 55%, #7e130e);
+    box-shadow: 0 4px 10px rgba(0,0,0,.55), inset 0 -3px 0 rgba(0,0,0,.25);
+    transition: transform .14s ease-out; pointer-events: none;
+  }
+  .stick.drag .knob { transition: none; }
+  .stick.drag { border-color: var(--amber); }
   .lockbtn {
     min-width: 100px; height: 62px; border-radius: 31px; border: 2px solid rgba(255,255,255,.3);
     background: rgba(12,16,22,.72); color: var(--dim); font: 400 19px var(--display); line-height: 1.05; touch-action: none;
@@ -218,9 +230,9 @@
   <div class="stage" id="stage">
     <canvas id="c" aria-label="크레인 운전석에서 내려다본 작업 화면"></canvas>
     <div class="pad" id="pad" hidden>
-      <div class="pad-grp pad-l"><div class="keys"><button class="pbtn" type="button" data-k="left" aria-label="트롤리 왼쪽">◀</button><button class="pbtn" type="button" data-k="right" aria-label="트롤리 오른쪽">▶</button></div><span>TROLLEY</span></div>
+      <div class="pad-grp pad-l"><div class="stick stick-x" data-axis="x" aria-label="트롤리 조이스틱: 좌우로 밀기"><i>◀</i><div class="knob"></div><i>▶</i></div><span>TROLLEY</span></div>
       <button class="lockbtn" id="lockbtn" type="button">잠금<small>LOCK</small></button>
-      <div class="pad-grp pad-r"><div class="keys"><button class="pbtn" type="button" data-k="up" aria-label="호이스트 올리기">▲</button><button class="pbtn" type="button" data-k="down" aria-label="호이스트 내리기">▼</button></div><span>HOIST</span></div>
+      <div class="pad-grp pad-r"><div class="stick stick-y" data-axis="y" aria-label="호이스트 조이스틱: 위로 올리기, 아래로 내리기"><i>▲</i><div class="knob"></div><i>▼</i></div><span>HOIST</span></div>
     </div>
   </div>
   <section class="vmt" id="vmt" aria-live="polite"></section>
@@ -326,7 +338,7 @@
     hard:   { tol: 4,   accel: 6,  coll: true },
   };
   const CTRL_DESC = {
-    pad: '트롤리(◀ ▶)와 호이스트(▲ ▼)를 직접 움직이고, 스프레더가 컨테이너에 착지·정렬되면 잠금/해제를 누릅니다. 키보드(방향키 + 스페이스)와 게임패드도 쓸 수 있어요.',
+    pad: '왼쪽 조이스틱을 좌우로 밀어 트롤리를, 오른쪽 조이스틱을 위아래로 밀어 호이스트를 움직입니다. 많이 밀수록 빠르고 살짝 밀면 천천히 움직여 정밀하게 맞출 수 있어요. 착지·정렬되면 잠금/해제. 키보드(방향키 + 스페이스)와 게임패드도 쓸 수 있어요.',
     tap: '열을 누르면 크레인이 자동으로 이동해 집고 내려놓습니다. 작업 순서를 먼저 익힐 때 좋아요.',
   };
   const PORTS = [
@@ -489,6 +501,7 @@
   const cvs = $('c'), ctx = cvs.getContext('2d');
   let scale = 1, LH = 500, L = null, G = null, ox = 0, VX0 = 0, VW = LW;
   const held = { left: false, right: false, up: false, down: false };
+  const stick = { x: 0, y: 0 }; // on-screen joystick deflection, -1..1
   let lockQueued = false, gpPrevA = false;
   const crane = { x: 0, q: [], carrying: null, wait: 0 };
   const truck = { off: 0, state: 'idle', box: null, cb: null };
@@ -556,8 +569,8 @@
     $('hud-title').innerHTML = `${kind === 'yard' ? '야드 이적·반출' : '본선 선적'}<small>${{ easy: '초보', normal: '중수', hard: '고수' }[diff]}</small>`;
     $('hud-time-label').textContent = kind === 'yard' ? '트럭 대기' : '경과';
     if (G.manual) say(G.kind === 'yard'
-      ? '◀ ▶로 트롤리를 대상 열 위에 맞추고 ▼로 내려 착지하면 잠금을 누르세요. 옮길 때는 ▲로 충분히 올리세요.'
-      : '트롤리를 트럭 위로 옮겨 ▼로 내리고 잠금, ▲로 올려 실을 열로 옮긴 뒤 내려서 해제하세요.', 'info');
+      ? '왼쪽 조이스틱으로 트롤리를 대상 열 위에 맞추고, 오른쪽 조이스틱을 아래로 당겨 착지하면 잠금을 누르세요. 옮길 때는 위로 밀어 충분히 올리세요.'
+      : '왼쪽 조이스틱으로 트롤리를 트럭 위에 맞추고, 오른쪽 조이스틱을 아래로 당겨 잠금. 위로 올려 실을 열로 옮긴 뒤 내려서 해제하세요.', 'info');
     renderVMT(); updateHud();
   }
 
@@ -767,6 +780,8 @@
   function manualUpdate(dt) {
     const m = G.m, cfg = MAN[G.diff];
     let ax = (held.right ? 1 : 0) - (held.left ? 1 : 0), ay = (held.down ? 1 : 0) - (held.up ? 1 : 0);
+    if (stick.x) ax = stick.x;
+    if (stick.y) ay = stick.y;
     const gp = readGamepad();
     if (gp) { if (gp.ax) ax = gp.ax; if (gp.ay) ay = gp.ay; }
     if (G.done) { ax = 0; ay = 0; }
@@ -1256,13 +1271,31 @@
                    ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down' };
   addEventListener('keyup', (e) => { if (KEYMAP[e.key]) held[KEYMAP[e.key]] = false; });
   addEventListener('blur', () => { for (const k in held) held[k] = false; });
-  for (const b of document.querySelectorAll('.pbtn')) {
-    const k = b.dataset.k;
-    const on = (e) => { e.preventDefault(); held[k] = true; b.classList.add('on'); try { b.setPointerCapture(e.pointerId); } catch (err) {} };
-    const off = () => { held[k] = false; b.classList.remove('on'); };
-    b.addEventListener('pointerdown', on);
-    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, off);
-    b.addEventListener('contextmenu', (e) => e.preventDefault());
+  for (const el of document.querySelectorAll('.stick')) {
+    const axis = el.dataset.axis, knob = el.querySelector('.knob');
+    let id = null;
+    const move = (e) => {
+      const r = el.getBoundingClientRect();
+      const len = axis === 'x' ? r.width : r.height, R = (len - knob.offsetWidth) / 2;
+      let d = axis === 'x' ? e.clientX - (r.left + r.width / 2) : e.clientY - (r.top + r.height / 2);
+      d = Math.max(-R, Math.min(R, d));
+      knob.style.transform = axis === 'x' ? `translateX(${d}px)` : `translateY(${d}px)`;
+      // dead zone, then a squared curve so small pushes give slow, precise moves
+      const v = d / R, a = Math.max(0, (Math.abs(v) - 0.12) / 0.88);
+      stick[axis] = Math.sign(v) * a * a;
+    };
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); id = e.pointerId; el.classList.add('drag');
+      try { el.setPointerCapture(id); } catch (err) {}
+      move(e);
+    });
+    el.addEventListener('pointermove', (e) => { if (e.pointerId === id) move(e); });
+    const end = (e) => {
+      if (e.pointerId !== id) return;
+      id = null; stick[axis] = 0; knob.style.transform = ''; el.classList.remove('drag');
+    };
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(ev, end);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
   }
   $('lockbtn').addEventListener('pointerdown', (e) => { e.preventDefault(); lockQueued = true; });
   $('lockbtn').addEventListener('click', (e) => { if (e.detail === 0) lockQueued = true; }); // keyboard activation
