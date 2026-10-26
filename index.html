@@ -69,8 +69,9 @@
     padding-block: 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
     padding-left: max(12px, env(safe-area-inset-left, 0px));
     padding-right: max(12px, env(safe-area-inset-right, 0px));
-    display: grid; gap: 8px;
+    display: flex; flex-direction: column; gap: 8px;
   }
+  .vmt > * { flex: 0 0 auto; }
   .vmt-head { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--dim); letter-spacing: .06em; text-transform: uppercase; }
   .vmt-head b { color: var(--amber); font-weight: 600; }
   .job { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: baseline; background: var(--vmt-2); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
@@ -109,7 +110,7 @@
   @media (orientation: landscape) and (min-width: 560px) {
     #app { max-width: 1280px; grid-template-columns: minmax(0, 1fr) minmax(270px, 36%); grid-template-rows: auto minmax(0, 1fr); }
     .hud { grid-column: 1 / -1; }
-    .vmt { max-height: none; border-top: 0; border-left: 2px solid #000; align-content: start; }
+    .vmt { max-height: none; border-top: 0; border-left: 2px solid #000; }
   }
 
   /* ---- on-screen controller ---- */
@@ -316,7 +317,7 @@
   const MAN = {
     easy:   { tol: 8,   accel: 14, coll: false },
     normal: { tol: 6,   accel: 11, coll: true },
-    hard:   { tol: 3.5, accel: 6,  coll: true },
+    hard:   { tol: 4,   accel: 6,  coll: true },
   };
   const CTRL_DESC = {
     pad: '트롤리(◀ ▶)와 호이스트(▲ ▼)를 직접 움직이고, 스프레더가 컨테이너에 착지·정렬되면 잠금/해제를 누릅니다. 키보드(방향키 + 스페이스)와 게임패드도 쓸 수 있어요.',
