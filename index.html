@@ -420,8 +420,8 @@
   }
   function playStep(i, t, len) {
     const m = MELODY[i];
-    if (m != null) { tone(m, t, len * 0.85, 'square', 0.05); tone(m + 12, t, len * 1.6, 'sine', 0.025); }
-    tone(BASS_ROOTS[i >> 3] + BASS_STEPS[i & 7], t, len * 0.8, 'triangle', 0.13);
+    if (m != null) { tone(m, t, len * 0.85, 'square', 0.11); tone(m + 12, t, len * 1.6, 'sine', 0.05); }
+    tone(BASS_ROOTS[i >> 3] + 12 + BASS_STEPS[i & 7], t, len * 0.8, 'triangle', 0.22);
     if (i & 1) hat(t);
   }
   function schedule() {
@@ -432,22 +432,44 @@
       music.next += len;
     }
   }
+  // iPhone mutes Web Audio when the ring/silent switch is off unless a media element is playing,
+  // so a silent looping <audio> runs alongside (and Safari 17+ is told this is playback audio).
+  let unlockEl = null;
+  function silentWav() {
+    const n = 4000, buf = new Uint8Array(44 + n), v = new DataView(buf.buffer);
+    const str = (o, t) => { for (let i = 0; i < t.length; i++) buf[o + i] = t.charCodeAt(i); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
+    v.setUint16(32, 1, true); v.setUint16(34, 8, true); str(36, 'data'); v.setUint32(40, n, true);
+    buf.fill(128, 44);
+    let bin = ''; for (const b of buf) bin += String.fromCharCode(b);
+    return 'data:audio/wav;base64,' + btoa(bin);
+  }
+  function unlockIOS() {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    try {
+      if (!unlockEl) { unlockEl = new Audio(silentWav()); unlockEl.loop = true; unlockEl.setAttribute('playsinline', ''); }
+      const pr = unlockEl.play(); if (pr && pr.catch) pr.catch(() => {});
+    } catch (e) {}
+  }
   function musicStart() {
     if (!music.on || document.hidden) return;
+    unlockIOS();
     try {
       if (!music.ac) {
         music.ac = new (window.AudioContext || window.webkitAudioContext)();
-        music.out = music.ac.createGain(); music.out.gain.value = 0.5; music.out.connect(music.ac.destination);
+        music.out = music.ac.createGain(); music.out.gain.value = 0.7; music.out.connect(music.ac.destination);
         music.noise = music.ac.createBuffer(1, music.ac.sampleRate * 0.1, music.ac.sampleRate);
         const d = music.noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       }
-      if (music.ac.state === 'suspended') music.ac.resume();
+      if (music.ac.state !== 'running') { const pr = music.ac.resume(); if (pr && pr.catch) pr.catch(() => {}); }
       if (!music.timer) { music.next = music.ac.currentTime + 0.05; music.timer = setInterval(schedule, 25); }
     } catch (e) {}
   }
   function musicStop() {
     clearInterval(music.timer); music.timer = null;
     try { if (music.ac) music.ac.suspend(); } catch (e) {}
+    try { if (unlockEl) unlockEl.pause(); } catch (e) {}
   }
   function renderMusicBtns() {
     for (const b of document.querySelectorAll('.music-btn')) { b.setAttribute('aria-pressed', String(music.on)); b.textContent = b.closest('.hud') ? '♪' : music.on ? '♪ 음악 켬' : '♪ 음악 끔'; }
@@ -459,8 +481,7 @@
     renderMusicBtns();
   });
   // Browsers only allow sound after the first tap or key press.
-  addEventListener('pointerdown', musicStart, true);
-  addEventListener('keydown', musicStart, true);
+  for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, musicStart, true);
   document.addEventListener('visibilitychange', () => { document.hidden ? musicStop() : musicStart(); });
   renderMusicBtns();
 
