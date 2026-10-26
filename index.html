@@ -3,122 +3,142 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#252b41">
+<meta name="theme-color" content="#1c1f22">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>TGIU 크레인 실습</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
-  /* Layout: crane-cab view (top-down canvas) on top, the cab's VMT terminal below.
-     Home and result screens cover the whole app. Single look on purpose: navy cab, red TGIU accents. */
+  /* Layout: a remote operating station. CCTV view of the crane (canvas) on top (or left in landscape),
+     the VMT/TOS terminal below (or right). Grey industrial HMI in the ISA-101 spirit: neutral by default,
+     colour only for machine state and alarms. TGIU red is the single brand accent. */
   :root {
-    --navy: #252b41;
-    --navy-2: #1a1f30;
+    --console: #1c1f22;
+    --panel: #26292d;
+    --panel-2: #2f3337;
+    --panel-3: #3b4045;
+    --well: #121416;
+    --line: rgba(255, 255, 255, 0.1);
+    --ink: #e6e8ea;
+    --dim: #9aa2a9;
+    --mute: #6b737a;
     --red: #cc231c;
-    --ink: #f1f3f7;
-    --dim: #a9b0c2;
-    --line: rgba(255, 255, 255, 0.13);
-    --vmt: #0c1016;
-    --vmt-2: #151b24;
-    --amber: #ffb547;
-    --good: #6fdc9c;
-    --bad: #ff6b5e;
-    --display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --alarm: #e5484d;
+    --warn: #f0a92c;
+    --ok: #3fb27f;
+    --info: #4d9fe0;
     --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
     color-scheme: dark;
   }
   [hidden] { display: none !important; }
-  html { height: 100%; box-sizing: border-box; background: var(--navy-2); }
+  html { height: 100%; box-sizing: border-box; background: var(--console); }
   *, *::before, *::after { box-sizing: inherit; }
   body {
-    height: 100%; margin: 0; overflow: hidden; background: var(--navy-2); color: var(--ink);
+    height: 100%; margin: 0; overflow: hidden; background: var(--console); color: var(--ink);
     font-family: var(--body); -webkit-tap-highlight-color: transparent;
     user-select: none; -webkit-user-select: none; touch-action: manipulation;
   }
   #app {
     position: relative; height: 100%; max-width: 520px; margin: 0 auto;
     display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: 100%;
-    background: var(--navy); overflow: hidden;
+    background: var(--console); overflow: hidden;
   }
   button { font: inherit; color: inherit; cursor: pointer; }
-  button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  button:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
 
-  /* ---- game HUD ---- */
+  /* ---- title bar ---- */
   .hud {
-    display: flex; align-items: center; gap: 10px;
-    padding-block: calc(env(safe-area-inset-top, 0px) + 8px) 8px;
-    padding-left: max(12px, env(safe-area-inset-left, 0px));
-    padding-right: max(12px, env(safe-area-inset-right, 0px));
-    background: var(--navy); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 8px;
+    padding-block: calc(env(safe-area-inset-top, 0px) + 6px) 6px;
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+    background: var(--panel); border-bottom: 1px solid #000; box-shadow: inset 0 -1px 0 var(--line);
   }
-  .music-btn { background: none; border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
-  .music-btn[aria-pressed="false"] { color: var(--dim); text-decoration: line-through; }
-  .hud .music-btn { font-size: 15px; padding: 3px 10px; }
-  @media (max-width: 400px) { #hud-time-label { display: none; } }
-  .home-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-  .hud-back { background: none; border: 1px solid var(--line); border-radius: 4px; padding: 5px 9px; font-size: 12px; }
-  .hud-title { flex: 1; min-width: 0; font: 400 17px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .hud-title small { font: 600 11px var(--body); color: var(--dim); margin-left: 6px; }
-  .hud-stats { display: flex; gap: 12px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .hud-stats b { color: var(--ink); font-size: 15px; }
-  .hud-stats .late b { color: var(--bad); }
+  .tool {
+    background: var(--panel-2); border: 1px solid #000; border-radius: 3px; padding: 6px 9px;
+    font-size: 12px; white-space: nowrap; box-shadow: inset 0 1px 0 var(--line);
+  }
+  .tool[aria-pressed="false"] { color: var(--mute); }
+  .hud-id { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; white-space: nowrap; overflow: hidden; }
+  .hud-id b { font: 600 12px var(--mono); letter-spacing: .06em; }
+  #hud-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+  .hud-id small { font: 600 10px var(--mono); color: var(--dim); border: 1px solid var(--line); padding: 1px 5px; border-radius: 2px; }
+  .lamp { width: 8px; height: 8px; border-radius: 50%; background: var(--mute); flex: 0 0 auto; }
+  .lamp.on { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .lamp.alarm { background: var(--alarm); box-shadow: 0 0 8px var(--alarm); }
+  .hud-stats { display: flex; gap: 5px; }
+  .kpi { display: grid; justify-items: end; background: var(--well); border: 1px solid #000; border-radius: 2px; padding: 2px 7px; min-width: 50px; }
+  .kpi small { font: 600 8.5px var(--mono); color: var(--mute); letter-spacing: .06em; }
+  .kpi b { font: 600 14px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
+  .kpi.late b { color: var(--alarm); }
+  @media (max-width: 420px) { #hud-title { display: none; } }
 
-  .stage { position: relative; min-height: 0; }
+  .stage { position: relative; min-height: 0; background: #000; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
-  /* ---- VMT (vehicle mounted terminal) ---- */
+  /* ---- VMT / TOS terminal ---- */
   .vmt {
     max-height: 40vh; max-height: 40dvh; overflow-y: auto;
-    background: var(--vmt); border-top: 2px solid #000; font-family: var(--mono);
-    padding-block: 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
-    padding-left: max(12px, env(safe-area-inset-left, 0px));
-    padding-right: max(12px, env(safe-area-inset-right, 0px));
-    display: flex; flex-direction: column; gap: 8px;
+    background: var(--console); border-top: 2px solid #000; font-family: var(--mono);
+    padding-block: 8px calc(env(safe-area-inset-bottom, 0px) + 8px);
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+    display: flex; flex-direction: column; gap: 6px;
   }
   .vmt > * { flex: 0 0 auto; }
-  .vmt-head { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--dim); letter-spacing: .06em; text-transform: uppercase; }
-  .vmt-head b { color: var(--amber); font-weight: 600; }
-  .job { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: baseline; background: var(--vmt-2); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
-  .job-label { grid-row: span 2; font: 600 11px var(--body); color: var(--amber); }
-  .job-no { font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: .02em; }
-  .job-loc { font-size: 11.5px; color: var(--dim); }
-  .job-loc b { color: var(--ink); }
-  .msg { font: 400 13px/1.45 var(--body); padding: 7px 10px; border-left: 3px solid var(--dim); background: rgba(255,255,255,.04); min-height: 2.9em; }
-  .msg.good { border-color: var(--good); }
-  .msg.bad { border-color: var(--bad); }
-  .msg.info { border-color: var(--amber); }
-  .bay { display: grid; gap: 2px; font-size: 9.5px; }
-  .bay-title { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); letter-spacing: .05em; }
-  .cell { height: 19px; border-radius: 2px; display: grid; place-items: center; background: rgba(255,255,255,.04); color: var(--ink); position: relative; font-variant-numeric: tabular-nums; }
-  .cell.box { background: #6b2320; }
-  .cell.box.navy { background: #2e3554; }
-  .cell.target { outline: 2px solid var(--amber); outline-offset: -2px; background: #8a5a12; }
-  .cell.pending { box-shadow: inset 0 -3px 0 var(--amber); }
-  .cell sup { position: absolute; top: -3px; right: 2px; color: var(--amber); font-size: 8.5px; font-weight: 600; }
-  .cell.plug { border: 1px dashed #5fb3ff; }
-  .lbl { color: var(--dim); display: grid; place-items: center; font-size: 9px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; font-size: 10.5px; }
-  .chip { border: 1px solid var(--line); border-radius: 3px; padding: 3px 6px; color: var(--dim); }
-  .chip.now { border-color: var(--amber); color: var(--ink); }
-  .chip.done { text-decoration: line-through; opacity: .55; }
-  .pod { display: inline-block; padding: 0 5px; border-radius: 2px; color: #11131a; font-weight: 600; }
+  .sec { background: var(--panel); border: 1px solid #000; box-shadow: inset 0 1px 0 var(--line); border-radius: 2px; }
+  .sec-h {
+    display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px;
+    background: var(--panel-2); border-bottom: 1px solid #000;
+    font: 600 9.5px var(--mono); letter-spacing: .1em; color: var(--dim); text-transform: uppercase;
+  }
+  .sec-h b { color: var(--ink); font-weight: 600; }
+  .sec-b { padding: 7px 8px; display: grid; gap: 6px; }
+  .job { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; align-items: center; }
+  .job-no { font-size: 16px; font-weight: 600; letter-spacing: .03em; }
+  .tag { font: 600 9.5px var(--mono); color: #111; background: var(--warn); padding: 2px 6px; border-radius: 2px; letter-spacing: .06em; }
+  .tag.ok { background: var(--ok); }
+  .job-loc { grid-column: 1 / -1; font-size: 11px; color: var(--dim); line-height: 1.5; }
+  .job-loc b { color: var(--ink); font-weight: 600; }
+  .log div { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 8px; padding: 5px 8px; font: 400 12.5px/1.45 var(--body); color: var(--dim); border-top: 1px solid rgba(0,0,0,.4); }
+  .log div:first-child { border-top: 0; color: var(--ink); }
+  .log time { font: 500 10px/1.9 var(--mono); color: var(--mute); }
+  .log .alarm { background: rgba(229,72,77,.14); }
+  .log .alarm:first-child { color: #ffdcdc; }
+  .log .alarm time { color: var(--alarm); }
+  .log .good time { color: var(--ok); }
+  .grid { display: grid; gap: 2px; font-size: 9.5px; }
+  .cell { height: 19px; border-radius: 1px; display: grid; place-items: center; background: rgba(255,255,255,.035); color: var(--ink); position: relative; font-variant-numeric: tabular-nums; }
+  .cell.box { background: var(--panel-3); }
+  .cell.target { background: rgba(240,169,44,.3); outline: 2px solid var(--warn); outline-offset: -2px; }
+  .cell.pending { box-shadow: inset 0 -2px 0 var(--warn); }
+  .cell sup { position: absolute; top: -3px; right: 2px; color: var(--warn); font-size: 8.5px; font-weight: 600; }
+  .cell.plug { border: 1px dashed var(--info); }
+  .lbl { color: var(--mute); display: grid; place-items: center; font-size: 9px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; font-size: 10px; }
+  .chip { border: 1px solid #000; background: var(--panel-2); border-radius: 2px; padding: 3px 6px; color: var(--dim); }
+  .chip.now { box-shadow: inset 0 -2px 0 var(--warn); color: var(--ink); }
+  .chip.done { opacity: .45; text-decoration: line-through; }
+  .pod { display: inline-block; padding: 0 5px; border-radius: 2px; color: #111; font-weight: 600; }
   .queue { display: grid; gap: 4px; font-size: 11.5px; }
-  .queue div { display: flex; gap: 8px; align-items: center; color: var(--dim); }
+  .queue div { display: flex; gap: 8px; align-items: center; color: var(--dim); min-width: 0; }
   .queue div:first-child { color: var(--ink); font-size: 13px; }
-  .gauge { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 10.5px; color: var(--dim); }
-  .gauge-bar { position: relative; height: 10px; border-radius: 5px; background: linear-gradient(90deg, rgba(255,107,94,.45), rgba(111,220,156,.35) 38%, rgba(111,220,156,.35) 62%, rgba(255,107,94,.45)); }
-  .gauge-bar i { position: absolute; top: -3px; width: 3px; height: 16px; background: var(--ink); border-radius: 2px; transform: translateX(-50%); }
-  .gauge-bar em { position: absolute; top: -2px; bottom: -2px; border-left: 1px dashed rgba(255,255,255,.5); }
+  .queue em { font: normal 600 9px var(--mono); color: var(--mute); width: 30px; flex: 0 0 auto; }
+  .gauge { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 10px; color: var(--dim); }
+  .gauge-bar { position: relative; height: 10px; background: var(--well); border: 1px solid #000; }
+  .gauge-bar .zone { position: absolute; top: 0; bottom: 0; background: rgba(63,178,127,.28); }
+  .gauge-bar i { position: absolute; top: -4px; width: 3px; height: 16px; background: var(--ink); transform: translateX(-50%); }
+  .gauge-bar i.over { background: var(--alarm); }
 
-  /* ---- landscape: cab view on the left, VMT on the right ---- */
+  /* ---- landscape: CCTV on the left, terminal on the right ---- */
   @media (orientation: landscape) and (min-width: 560px) {
     #app { max-width: 1280px; grid-template-columns: minmax(0, 1fr) minmax(270px, 36%); grid-template-rows: auto minmax(0, 1fr); }
     .hud { grid-column: 1 / -1; }
     .vmt { max-height: none; border-top: 0; border-left: 2px solid #000; }
   }
 
-  /* ---- on-screen controller ---- */
+  /* ---- operator controls ---- */
   .pad {
     position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px;
     padding-bottom: 10px;
@@ -127,123 +147,150 @@
     pointer-events: none;
   }
   .pad > * { pointer-events: auto; }
-  .pad-grp { display: grid; gap: 5px; justify-items: center; }
-  .pad-grp span { font: 600 9.5px var(--mono); color: #fff; text-shadow: 0 1px 3px #000; letter-spacing: .08em; }
-  /* Joysticks are gated levers like a crane cab: left one only slides sideways, right one only up/down. */
+  .pad-grp { display: grid; gap: 4px; justify-items: center; }
+  .pad-grp > span { font: 600 9px var(--mono); color: #d6d9dc; text-shadow: 0 1px 3px #000; letter-spacing: .1em; }
+  /* Gated levers like a crane chair: left lever only slides sideways, right lever only up/down. */
   .stick {
     position: relative; display: flex; align-items: center; justify-content: space-between;
-    background: rgba(12,16,22,.62); border: 1px solid rgba(255,255,255,.25); border-radius: 36px; touch-action: none;
+    background: linear-gradient(#34383d, #1d2023); border: 1px solid #000; border-radius: 10px; touch-action: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 3px 8px rgba(0,0,0,.55);
   }
-  .stick-x { width: 136px; height: 64px; padding: 0 10px; }
-  .stick-y { width: 64px; height: 136px; flex-direction: column; padding: 10px 0; }
-  .stick::before { content: ""; position: absolute; background: rgba(0,0,0,.5); border-radius: 3px; }
-  .stick-x::before { left: 24px; right: 24px; top: 50%; height: 6px; margin-top: -3px; }
-  .stick-y::before { top: 24px; bottom: 24px; left: 50%; width: 6px; margin-left: -3px; }
-  .stick i { font-style: normal; font-size: 10px; color: rgba(255,255,255,.5); pointer-events: none; }
+  .stick-x { width: 136px; height: 62px; padding: 0 10px; }
+  .stick-y { width: 62px; height: 136px; flex-direction: column; padding: 10px 0; }
+  .stick::before { content: ""; position: absolute; background: #08090a; border-radius: 4px; box-shadow: inset 0 1px 2px #000; }
+  .stick-x::before { left: 24px; right: 24px; top: 50%; height: 8px; margin-top: -4px; }
+  .stick-y::before { top: 24px; bottom: 24px; left: 50%; width: 8px; margin-left: -4px; }
+  .stick i { font-style: normal; font-size: 9px; color: rgba(255,255,255,.4); pointer-events: none; }
   .knob {
-    position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #ff7a6e, var(--red) 55%, #7e130e);
-    box-shadow: 0 4px 10px rgba(0,0,0,.55), inset 0 -3px 0 rgba(0,0,0,.25);
-    transition: transform .14s ease-out; pointer-events: none;
+    position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #5a6066, #2b2f33 60%, #141618); border: 2px solid #0b0c0d;
+    box-shadow: 0 5px 10px rgba(0,0,0,.6); transition: transform .14s ease-out; pointer-events: none;
+  }
+  .knob::after {
+    content: ""; position: absolute; inset: 13px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #ff6b5f, var(--red) 60%, #7e130e);
   }
   .stick.drag .knob { transition: none; }
-  .stick.drag { border-color: var(--amber); }
+  .stick.drag { box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 0 0 1px var(--info), 0 3px 8px rgba(0,0,0,.55); }
+  .center-grp { display: grid; gap: 6px; justify-items: center; }
+  .lamps { display: flex; gap: 9px; background: rgba(18,20,22,.9); border: 1px solid #000; padding: 4px 9px; border-radius: 3px; }
+  .lamps span { display: grid; justify-items: center; gap: 2px; font: 600 7.5px var(--mono); color: var(--mute); letter-spacing: .06em; }
+  .lamps i { width: 10px; height: 10px; border-radius: 50%; background: #393e43; box-shadow: inset 0 1px 2px #000; }
+  .lamps i.w { background: #f4f4f4; box-shadow: 0 0 7px rgba(255,255,255,.9); }
+  .lamps i.g { background: var(--ok); box-shadow: 0 0 7px var(--ok); }
+  .lamps i.a { background: var(--warn); box-shadow: 0 0 7px var(--warn); }
   .lockbtn {
-    min-width: 100px; height: 62px; border-radius: 31px; border: 2px solid rgba(255,255,255,.3);
-    background: rgba(12,16,22,.72); color: var(--dim); font: 400 19px var(--display); line-height: 1.05; touch-action: none;
+    min-width: 104px; height: 52px; border-radius: 4px; border: 1px solid #000;
+    background: linear-gradient(#41464b, #2a2e32); color: var(--mute); font: 700 15px/1.1 var(--body);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 3px 0 #0b0c0d; touch-action: none;
   }
-  .lockbtn small { display: block; font: 600 9.5px var(--mono); letter-spacing: .06em; }
-  .lockbtn.ready { background: var(--good); color: #0b1a10; border-color: transparent; }
-  .lockbtn.release { background: var(--amber); color: #1a1205; border-color: transparent; }
+  .lockbtn small { display: block; font: 600 9px var(--mono); letter-spacing: .08em; }
+  .lockbtn.ready { background: linear-gradient(#4cc795, #2e9767); color: #06150e; }
+  .lockbtn.release { background: linear-gradient(#f6bd4f, #d68f16); color: #1a1205; }
+  .lockbtn:active { transform: translateY(2px); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1px 0 #0b0c0d; }
 
   /* ---- full screens (home / result) ---- */
   .screen {
-    position: absolute; inset: 0; z-index: 5; overflow-y: auto; background: var(--navy);
-    padding-block: calc(env(safe-area-inset-top, 0px) + 22px) calc(env(safe-area-inset-bottom, 0px) + 24px);
-    padding-left: max(18px, env(safe-area-inset-left, 0px));
-    padding-right: max(18px, env(safe-area-inset-right, 0px));
+    position: absolute; inset: 0; z-index: 5; overflow-y: auto; background: var(--console);
+    padding-block: calc(env(safe-area-inset-top, 0px) + 18px) calc(env(safe-area-inset-bottom, 0px) + 24px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
-  .wrap { display: grid; gap: 16px; max-width: 440px; margin: 0 auto; }
-  .eyebrow { font: 600 11px var(--mono); letter-spacing: .14em; color: var(--amber); text-transform: uppercase; }
-  h1, h2 { font-family: var(--display); font-weight: 400; margin: 0; line-height: 1.08; text-wrap: balance; }
-  h1 { font-size: 40px; }
+  .wrap { display: grid; gap: 12px; max-width: 460px; margin: 0 auto; }
+  .brand { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .eyebrow { font: 600 10.5px var(--mono); letter-spacing: .16em; color: var(--dim); text-transform: uppercase; }
+  .eyebrow b { color: var(--red); }
+  h1, h2 { margin: 0; text-wrap: balance; }
+  h1 { font: 700 29px/1.2 var(--body); letter-spacing: -.01em; }
   h1 span { color: var(--red); }
-  h2 { font-size: 32px; }
+  h2 { font: 700 25px/1.25 var(--body); }
   .lead { margin: 0; color: var(--dim); font-size: 14px; line-height: 1.6; }
-  .section-label { font: 600 12px var(--body); color: var(--dim); letter-spacing: .04em; margin-bottom: -6px; }
-  .modes { display: grid; gap: 10px; }
+  .panel { background: var(--panel); border: 1px solid #000; box-shadow: inset 0 1px 0 var(--line); border-radius: 3px; }
+  .panel-b { padding: 10px; display: grid; gap: 8px; }
+  .modes { display: grid; gap: 8px; }
   .mode {
-    text-align: left; background: var(--navy-2); border: 1px solid var(--line); border-radius: 6px;
-    padding: 14px; display: grid; grid-template-columns: 44px 1fr; gap: 4px 12px;
+    text-align: left; background: var(--panel-2); border: 1px solid #000; border-radius: 3px;
+    padding: 12px; display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 3px 12px;
+    box-shadow: inset 0 1px 0 var(--line);
   }
-  .mode[aria-pressed="true"] { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
-  .mode-icon { grid-row: span 3; width: 44px; height: 44px; border-radius: 4px; display: grid; place-items: center; font: 600 11px var(--mono); color: #fff; background: #3a4262; }
-  .mode[aria-pressed="true"] .mode-icon { background: var(--red); }
-  .mode b { font: 400 19px var(--display); }
+  .mode[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--red), inset 0 0 0 1px rgba(204,35,28,.7); }
+  .mode-icon { grid-row: span 3; width: 42px; height: 42px; border-radius: 2px; display: grid; place-items: center; font: 600 11px var(--mono); background: var(--well); border: 1px solid #000; color: var(--dim); }
+  .mode[aria-pressed="true"] .mode-icon { background: var(--red); color: #fff; }
+  .mode b { font: 700 16px var(--body); }
   .mode span { font-size: 13px; color: var(--dim); line-height: 1.5; }
-  .mode small { font: 500 10.5px var(--mono); color: var(--amber); letter-spacing: .03em; }
-  .diffs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-  .diff { background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 10px 4px; font: 400 18px var(--display); }
-  .diff[aria-pressed="true"] { border-color: var(--amber); background: rgba(255,181,71,.12); color: var(--amber); }
-  .diff-desc { margin: 0; font-size: 13px; color: var(--dim); line-height: 1.55; min-height: 4.6em; }
-  .best { font-size: 12px; color: var(--dim); }
+  .mode small { font: 500 10px var(--mono); color: var(--warn); letter-spacing: .03em; }
+  .seg { display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); gap: 4px; background: var(--well); border: 1px solid #000; border-radius: 3px; padding: 3px; }
+  .seg button { background: transparent; border: 0; border-radius: 2px; padding: 9px 4px; font: 600 14px var(--body); color: var(--dim); }
+  .seg button[aria-pressed="true"] { background: var(--panel-3); color: var(--ink); box-shadow: inset 0 -2px 0 var(--info), inset 0 1px 0 var(--line); }
+  .desc { margin: 0; font-size: 12.5px; color: var(--dim); line-height: 1.55; }
+  .sound-row { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: center; font-size: 12px; color: var(--dim); }
+  .best { font: 500 11.5px var(--mono); color: var(--dim); }
   .best b { color: var(--ink); }
   .cta {
-    font: 400 21px var(--display); color: #fff; background: var(--red); border: 0; border-radius: 5px;
-    padding: 14px; box-shadow: 0 3px 0 #8a1611;
+    font: 700 17px var(--body); color: #fff; background: var(--red); border: 1px solid #000; border-radius: 3px;
+    padding: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 3px 0 #5e0f0b; letter-spacing: .02em;
   }
-  .cta:active { transform: translateY(2px); box-shadow: 0 1px 0 #8a1611; }
-  .ghost { background: transparent; border: 1px solid var(--line); border-radius: 5px; padding: 12px; font-weight: 600; font-size: 14px; }
+  .cta:active { transform: translateY(2px); box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 1px 0 #5e0f0b; }
+  .ghost { background: var(--panel-2); border: 1px solid #000; border-radius: 3px; padding: 12px; font-weight: 600; font-size: 14px; box-shadow: inset 0 1px 0 var(--line); }
   details { border-top: 1px solid var(--line); padding-top: 12px; }
   summary { cursor: pointer; font-weight: 600; font-size: 14px; }
   dl { margin: 10px 0 0; display: grid; gap: 10px; font-size: 13px; line-height: 1.5; }
-  dt { font-weight: 600; color: var(--ink); }
+  dt { font-weight: 600; }
   dd { margin: 0; color: var(--dim); }
-  .fine { margin: 0; font-size: 11px; color: rgba(169,176,194,.75); }
+  .fine { margin: 0; font-size: 11px; color: var(--mute); }
 
-  .score-row { display: flex; align-items: baseline; gap: 14px; }
-  .score-big { font: 400 64px/1 var(--display); font-variant-numeric: tabular-nums; }
-  .stars { font-size: 26px; letter-spacing: 3px; color: var(--amber); }
-  .stars i { font-style: normal; color: rgba(255,255,255,.18); }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; border-block: 1px solid var(--line); padding-block: 12px; }
-  .stats div { display: grid; gap: 2px; min-width: 0; }
-  .stats b { font: 400 22px var(--display); font-variant-numeric: tabular-nums; }
+  .score-row { display: flex; align-items: center; gap: 14px; }
+  .score-big { font: 600 58px/1 var(--mono); font-variant-numeric: tabular-nums; }
+  .grade { display: flex; gap: 6px; }
+  .grade i { width: 14px; height: 14px; border-radius: 50%; background: #393e43; box-shadow: inset 0 1px 2px #000; }
+  .grade i.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #000; border: 1px solid #000; }
+  .stats div { display: grid; gap: 2px; min-width: 0; background: var(--panel); padding: 8px 10px; }
+  .stats b { font: 600 19px var(--mono); font-variant-numeric: tabular-nums; }
   .stats span { font-size: 11px; color: var(--dim); }
-  .review { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-  .review li { background: var(--navy-2); border-left: 3px solid var(--bad); border-radius: 3px; padding: 10px 12px; font-size: 13px; line-height: 1.5; color: var(--dim); }
-  .review li.ok { border-color: var(--good); }
+  .review { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .review li { background: var(--panel); border: 1px solid #000; border-left: 3px solid var(--alarm); border-radius: 2px; padding: 9px 11px; font-size: 13px; line-height: 1.5; color: var(--dim); }
+  .review li.ok { border-left-color: var(--ok); }
   .review b { color: var(--ink); display: block; margin-bottom: 2px; }
   .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .section-label { font: 600 10px var(--mono); color: var(--dim); letter-spacing: .14em; text-transform: uppercase; }
 </style>
 </head>
 <body>
 <div id="app">
   <header class="hud">
-    <button class="hud-back" id="back" type="button">← 홈</button>
-    <div class="hud-title" id="hud-title">야드 이적·반출</div>
+    <button class="tool" id="back" type="button">◂ 홈</button>
+    <div class="hud-id"><span class="lamp on" id="hud-lamp"></span><b id="hud-eq">RTG-07</b><span id="hud-title">야드 이적·반출</span><small id="hud-diff">초보</small></div>
     <div class="hud-stats">
-      <span id="hud-time-wrap"><span id="hud-time-label">트럭 대기</span> <b id="hud-time">00:00</b></span>
-      <span>점수 <b id="hud-score">100</b></span>
+      <span class="kpi" id="hud-time-wrap"><small id="hud-time-label">트럭 대기</small><b id="hud-time">00:00</b></span>
+      <span class="kpi"><small>점수</small><b id="hud-score">100</b></span>
     </div>
-    <button class="music-btn" type="button" aria-label="배경음악 켜기/끄기">♪ 음악</button>
+    <button class="tool" id="music-btn" type="button" aria-label="배경음악 켜기/끄기">♪</button>
   </header>
   <div class="stage" id="stage">
-    <canvas id="c" aria-label="크레인 운전석에서 내려다본 작업 화면"></canvas>
+    <canvas id="c" aria-label="원격 조종실 CCTV로 내려다본 크레인 작업 화면"></canvas>
     <div class="pad" id="pad" hidden>
-      <div class="pad-grp pad-l"><div class="stick stick-x" data-axis="x" aria-label="트롤리 조이스틱: 좌우로 밀기"><i>◀</i><div class="knob"></div><i>▶</i></div><span>TROLLEY</span></div>
-      <button class="lockbtn" id="lockbtn" type="button">잠금<small>LOCK</small></button>
-      <div class="pad-grp pad-r"><div class="stick stick-y" data-axis="y" aria-label="호이스트 조이스틱: 위로 올리기, 아래로 내리기"><i>▲</i><div class="knob"></div><i>▼</i></div><span>HOIST</span></div>
+      <div class="pad-grp"><div class="stick stick-x" data-axis="x" aria-label="트롤리 레버: 좌우로 밀기"><i>◀</i><div class="knob"></div><i>▶</i></div><span>TROLLEY</span></div>
+      <div class="center-grp">
+        <div class="lamps" aria-label="스프레더 상태등">
+          <span><i id="lamp-land"></i>LANDED</span>
+          <span><i id="lamp-align"></i>ALIGN</span>
+          <span><i id="lamp-lock"></i>TWL</span>
+        </div>
+        <button class="lockbtn" id="lockbtn" type="button">잠금<small>LOCK</small></button>
+      </div>
+      <div class="pad-grp"><div class="stick stick-y" data-axis="y" aria-label="호이스트 레버: 위로 올리기, 아래로 내리기"><i>▲</i><div class="knob"></div><i>▼</i></div><span>HOIST</span></div>
     </div>
   </div>
   <section class="vmt" id="vmt" aria-live="polite"></section>
 
   <div class="screen" id="home">
     <div class="wrap">
-      <div class="home-top"><div class="eyebrow">TGIU · Crane training</div><button class="music-btn" type="button" aria-label="배경음악 켜기/끄기">♪ 음악</button></div>
-      <h1><span>TGIU</span> 크레인 실습</h1>
-      <p class="lead">크레인 운전석에서 내려다보며 컨테이너를 다룹니다. 야드에서 반출할 컨테이너를 이적해 꺼내고, 부두에서 본선에 선적해 보세요.</p>
+      <div class="brand"><div class="eyebrow"><b>TGIU</b> · Remote operating station</div></div>
+      <h1><span>TGIU</span> 크레인 원격 조종 실습</h1>
+      <p class="lead">원격 조종실에서 CCTV 화면을 보며 크레인을 운전합니다. 야드에서 반출 컨테이너를 이적해 꺼내고, 부두에서 본선에 선적해 보세요.</p>
 
-      <div class="section-label">작업 선택</div>
+      <div class="section-label">작업</div>
       <div class="modes">
         <button class="mode" type="button" data-game="yard">
           <div class="mode-icon">RTG</div>
@@ -259,31 +306,65 @@
         </button>
       </div>
 
-      <div class="section-label">난이도</div>
-      <div class="diffs" role="group" aria-label="난이도">
-        <button class="diff" type="button" data-diff="easy">초보</button>
-        <button class="diff" type="button" data-diff="normal">중수</button>
-        <button class="diff" type="button" data-diff="hard">고수</button>
-      </div>
-      <p class="diff-desc" id="diff-desc"></p>
+      <section class="panel"><div class="panel-b">
+        <div class="section-label">난이도</div>
+        <div class="seg" role="group" aria-label="난이도">
+          <button type="button" data-diff="easy">초보</button>
+          <button type="button" data-diff="normal">중수</button>
+          <button type="button" data-diff="hard">고수</button>
+        </div>
+        <p class="desc" id="diff-desc"></p>
+      </div></section>
 
-      <div class="section-label">조작 방식</div>
-      <div class="diffs" role="group" aria-label="조작 방식" style="grid-template-columns: 1fr 1fr">
-        <button class="diff" type="button" data-ctrl="pad">컨트롤러</button>
-        <button class="diff" type="button" data-ctrl="tap">탭</button>
-      </div>
-      <p class="diff-desc" id="ctrl-desc" style="min-height: 0"></p>
+      <section class="panel"><div class="panel-b">
+        <div class="section-label">조작 방식</div>
+        <div class="seg" style="--n: 2" role="group" aria-label="조작 방식">
+          <button type="button" data-ctrl="pad">조이스틱</button>
+          <button type="button" data-ctrl="tap">탭 (자동)</button>
+        </div>
+        <p class="desc" id="ctrl-desc"></p>
+      </div></section>
+
+      <section class="panel"><div class="panel-b">
+        <div class="section-label">작업 환경</div>
+        <div class="seg" role="group" aria-label="작업 환경">
+          <button type="button" data-env="day">주간</button>
+          <button type="button" data-env="night">야간</button>
+          <button type="button" data-env="rain">우천</button>
+        </div>
+        <p class="desc" id="env-desc"></p>
+      </div></section>
+
+      <section class="panel"><div class="panel-b">
+        <div class="section-label">소리</div>
+        <div class="sound-row"><span>배경음악</span>
+          <div class="seg" role="group" aria-label="배경음악">
+            <button type="button" data-track="calm">관제실</button>
+            <button type="button" data-track="claw">인형뽑기</button>
+            <button type="button" data-track="off">끔</button>
+          </div>
+        </div>
+        <div class="sound-row"><span>효과음</span>
+          <div class="seg" style="--n: 2" role="group" aria-label="효과음">
+            <button type="button" data-sfx="on">켬</button>
+            <button type="button" data-sfx="off">끔</button>
+          </div>
+        </div>
+      </div></section>
+
       <div class="best" id="home-best"></div>
       <button class="cta" id="go" type="button">운전 시작</button>
 
       <details>
         <summary>현장 용어 정리</summary>
         <dl>
-          <dt>RTG (트랜스퍼 크레인)</dt><dd>야드 블록을 가로질러 서서 컨테이너를 쌓고 꺼내는 크레인. 운전석은 트롤리에 매달려 있어 바로 아래를 내려다봅니다.</dd>
+          <dt>RTG (트랜스퍼 크레인)</dt><dd>야드 블록을 가로질러 서서 컨테이너를 쌓고 꺼내는 크레인. 요즘은 원격 조종실에서 CCTV를 보며 운전하는 곳이 많습니다.</dd>
           <dt>이적 (Shifting)</dt><dd>꺼낼 컨테이너 위에 쌓인 컨테이너를 다른 열로 옮기는 작업.</dd>
           <dt>재취급 (Rehandling)</dt><dd>한 번 옮긴 컨테이너를 또 옮겨야 하는 상황. 장비 시간과 비용이 늘어납니다.</dd>
           <dt>야드 위치 A03-15-04-2</dt><dd>블록 A03, 베이 15, 열(Row) 04, 단(Tier) 2. 단은 바닥이 1단입니다.</dd>
-          <dt>트롤리 · 호이스트 · 스프레더</dt><dd>트롤리는 크레인 빔을 따라 좌우로 움직이는 대차, 호이스트는 컨테이너를 올리고 내리는 장치, 스프레더는 컨테이너 네 모서리에 트위스트락을 꽂아 잡는 장치입니다.</dd>
+          <dt>트롤리 · 호이스트 · 스프레더</dt><dd>트롤리는 크레인 빔을 따라 좌우로 움직이는 대차, 호이스트는 컨테이너를 올리고 내리는 장치, 스프레더는 컨테이너 네 모서리에 트위스트락(TWL)을 꽂아 잡는 장치입니다.</dd>
+          <dt>스프레더 상태등</dt><dd>LANDED는 스프레더가 컨테이너에 안착, TWL 초록은 트위스트락 잠김, 주황은 풀림입니다. 실제 스프레더에도 이런 표시등이 달려 있습니다.</dd>
+          <dt>스웨이 (Sway)</dt><dd>트롤리가 급하게 출발하거나 멈추면 매달린 스프레더가 흔들립니다. 흔들림이 멈춘 뒤 내려야 정확히 안착합니다.</dd>
           <dt>STS (안벽 크레인)</dt><dd>부두에서 선박으로 컨테이너를 싣고 내리는 크레인.</dd>
           <dt>POD (양하항)</dt><dd>컨테이너를 내릴 항구. 먼저 들르는 항구의 컨테이너가 위에 있어야 합니다.</dd>
           <dt>Overstow</dt><dd>나중에 내릴 컨테이너가 먼저 내릴 컨테이너 위에 실린 상태. 중간 항구에서 내렸다 다시 실어야(restow) 합니다.</dd>
@@ -299,7 +380,7 @@
     <div class="wrap">
       <div class="eyebrow" id="r-eyebrow">작업 종료</div>
       <h2 id="r-title">작업 완료</h2>
-      <div class="score-row"><div class="score-big" id="r-score">100</div><div class="stars" id="r-stars"></div></div>
+      <div class="score-row"><div class="score-big" id="r-score">100</div><div class="grade" id="r-grade" aria-label="등급"></div></div>
       <div class="stats" id="r-stats"></div>
       <div class="section-label">작업 복기</div>
       <ul class="review" id="r-review"></ul>
@@ -321,7 +402,7 @@
     normal: { rows: 6, tiers: 4, orders: 3, fill: 0.62, hintTarget: true,  hintPlace: false, waitLimit: 0,
               desc: '6열 4단 야드, 반출 3건. 꺼낼 컨테이너만 표시됩니다. 다음 오더를 보고 이적 위치를 직접 판단하세요.' },
     hard:   { rows: 6, tiers: 5, orders: 4, fill: 0.66, hintTarget: false, hintPlace: false, waitLimit: 45,
-              desc: '6열 5단 야드, 반출 4건. 화면 표시 없이 VMT 위치 정보만 보고 작업합니다. 트럭 대기 제한(탭 45초, 컨트롤러 90초).' },
+              desc: '6열 5단 야드, 반출 4건. 화면 표시 없이 VMT 위치 정보만 보고 작업합니다. 트럭 대기 제한(탭 45초, 조이스틱 90초).' },
   };
   const SHIP = {
     easy:   { rows: 5, tiers: 3, count: 10, pods: 2, weights: false, reefer: false, heelLimit: 0,
@@ -331,22 +412,27 @@
     hard:   { rows: 6, tiers: 4, count: 20, pods: 3, weights: true,  reefer: true,  heelLimit: 2,
               desc: '6열 4단, 20개 선적. 냉동 컨테이너는 플러그 열에만, 작업 종료 시 횡경사 2° 이내여야 합니다.' },
   };
-  // Manual (controller) handling: alignment tolerance, trolley responsiveness, collision penalty.
+  // Manual handling: alignment tolerance, trolley responsiveness, sway damping, collision penalty.
   const MAN = {
-    easy:   { tol: 8,   accel: 14, coll: false },
-    normal: { tol: 6,   accel: 11, coll: true },
-    hard:   { tol: 4,   accel: 6,  coll: true },
+    easy:   { tol: 8, accel: 14, damp: 7,   coll: false },
+    normal: { tol: 6, accel: 11, damp: 3.2, coll: true },
+    hard:   { tol: 4, accel: 6,  damp: 1.8, coll: true },
   };
   const CTRL_DESC = {
-    pad: '왼쪽 조이스틱을 좌우로 밀어 트롤리를, 오른쪽 조이스틱을 위아래로 밀어 호이스트를 움직입니다. 많이 밀수록 빠르고 살짝 밀면 천천히 움직여 정밀하게 맞출 수 있어요. 착지·정렬되면 잠금/해제. 키보드(방향키 + 스페이스)와 게임패드도 쓸 수 있어요.',
+    pad: '왼쪽 레버를 좌우로 밀어 트롤리를, 오른쪽 레버를 위아래로 밀어 호이스트를 움직입니다. 많이 밀수록 빠르고, 살짝 밀면 천천히 움직여요. 급하게 멈추면 스프레더가 흔들립니다(스웨이). 키보드(방향키 + 스페이스)와 게임패드도 지원합니다.',
     tap: '열을 누르면 크레인이 자동으로 이동해 집고 내려놓습니다. 작업 순서를 먼저 익힐 때 좋아요.',
+  };
+  const ENV_DESC = {
+    day: '주간 작업. 시야가 가장 좋습니다.',
+    night: '야간 작업. CCTV가 흑백 적외선 화면으로 바뀌고, 조명이 닿는 곳만 잘 보입니다.',
+    rain: '우천 작업. 빗줄기와 렌즈의 물방울로 시야가 흐리고, 트롤리가 미끄러지며 스프레더가 더 오래 흔들립니다.',
   };
   const PORTS = [
     { code: 'SHA', name: '상하이', color: '#f2b23a' },
     { code: 'NGB', name: '닝보', color: '#3fc2b2' },
     { code: 'SIN', name: '싱가포르', color: '#b597f0' },
   ];
-  const COLORS = [['#cc231c', '#a51b15'], ['#a91f1a', '#861612'], ['#2e3554', '#1f2438']];
+  const COLORS = [['#c3271f', '#9e1c16'], ['#a3221c', '#7f1712'], ['#2f3550', '#20253a']];
   const PEN = {
     unneeded:    { name: '불필요한 이적', tip: '반출 대상 위에 있지 않은 컨테이너를 옮기면 장비 시간과 연료만 늘어납니다. VMT에서 대상 위치를 먼저 확인하세요.' },
     buryCurrent: { name: '반출 대상 위에 적재', tip: '꺼내야 할 컨테이너 위에 다시 올리면 같은 작업을 한 번 더 해야 합니다.' },
@@ -358,6 +444,7 @@
     collision:   { name: '충돌 경고', tip: '트롤리를 옮길 때는 호이스트를 충분히 올려 다른 컨테이너에 부딪히지 않게 하세요. 실제로는 컨테이너 손상과 안전사고로 이어집니다.' },
     heel:        { name: '횡경사 초과', tip: '한쪽에 무게가 쏠리면 배가 기울어 하역과 운항이 위험합니다. 좌현·우현에 번갈아 실어 균형을 맞추세요.' },
   };
+  const DIFF_NAME = { easy: '초보', normal: '중수', hard: '고수' };
 
   // ================= helpers =================
   const $ = (id) => document.getElementById(id);
@@ -367,10 +454,12 @@
   const now = () => performance.now();
   const pad2 = (n) => String(n).padStart(2, '0');
   const fmtTime = (s) => `${pad2(Math.floor(s / 60))}:${pad2(Math.floor(s % 60))}`;
+  const clock = () => { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`; };
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
   };
+  const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
 
   // ISO 6346 container number with a real check digit
   const LETTER = {};
@@ -385,9 +474,17 @@
     for (let i = 0; i < 10; i++) sum += (LETTER[code[i]] ?? +code[i]) * 2 ** i;
     return { no: `TGIU ${serial} ${(sum % 11) % 10}`, short: serial.slice(2) };
   }
+  // Every box gets its own wear: paint fade, rust patches and the odd dent, like a real fleet.
+  function makeWear() {
+    return {
+      shade: (Math.random() - 0.5) * 0.14,
+      rust: Array.from({ length: rand(4) }, () => ({ x: Math.random() * 0.75, y: Math.random() * 0.9, w: 0.08 + Math.random() * 0.25, h: 0.02 + Math.random() * 0.06, a: 0.18 + Math.random() * 0.3 })),
+      dent: Math.random() < 0.3 ? 0.15 + Math.random() * 0.7 : null,
+    };
+  }
   function makeBox(extra = {}) {
     const n = containerNo();
-    return { no: n.no, short: n.short, c: rand(COLORS.length), type: '22G1', ...extra };
+    return { no: n.no, short: n.short, c: rand(COLORS.length), type: '22G1', w: pick([4.2, 9, 13, 17, 21, 25]), wear: makeWear(), ...extra };
   }
   const plate = () => `부산${90 + rand(10)}사 ${1000 + rand(9000)}`;
 
@@ -400,50 +497,18 @@
     return out;
   }
   const yardLoc = (r, i) => `A03-15-${pad2(r + 1)}-${i + 1}`;
-
   const buzz = (ms) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
 
-  // ================= background music =================
-  // Original bouncy claw-machine style loop, synthesised live (no audio files).
-  // 8 bars of 8th notes: lead melody (midi numbers, null = rest) over a root/octave/fifth bass.
-  const MELODY = [
-    76, 79, 84, 79, 76, 79, 84, null,   74, 77, 81, 77, 74, 77, 81, null,
-    76, 79, 84, 88, 86, 84, 81, 79,     77, 81, 79, 76, 74, null, 72, null,
-    81, 84, 81, 79, 76, 79, 81, null,   79, 76, 74, 76, 79, null, null, null,
-    84, 83, 81, 79, 81, 83, 84, 86,     88, 84, 79, 76, 72, null, null, null,
-  ];
-  const BASS_ROOTS = [48, 50, 48, 43, 45, 52, 41, 48]; // C Dm C G Am Em F C
-  const BASS_STEPS = [0, 12, 7, 12, 0, 12, 7, 12];
-  const music = { on: store_get('edu-music') !== '0', ac: null, out: null, noise: null, step: 0, next: 0, timer: null };
-  function store_get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  function tone(midi, t, dur, type, vol) {
-    const ac = music.ac, o = ac.createOscillator(), g = ac.createGain();
-    o.type = type; o.frequency.value = 440 * 2 ** ((midi - 69) / 12);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(music.out); o.start(t); o.stop(t + dur + 0.03);
-  }
-  function hat(t) {
-    const ac = music.ac, src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-    src.buffer = music.noise; f.type = 'highpass'; f.frequency.value = 7000;
-    g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
-    src.connect(f).connect(g).connect(music.out); src.start(t); src.stop(t + 0.05);
-  }
-  function playStep(i, t, len) {
-    const m = MELODY[i];
-    if (m != null) { tone(m, t, len * 0.85, 'square', 0.11); tone(m + 12, t, len * 1.6, 'sine', 0.05); }
-    tone(BASS_ROOTS[i >> 3] + 12 + BASS_STEPS[i & 7], t, len * 0.8, 'triangle', 0.22);
-    if (i & 1) hat(t);
-  }
-  function schedule() {
-    const len = 60 / 140 / 2; // 140 BPM, 8th notes
-    while (music.next < music.ac.currentTime + 0.15) {
-      playStep(music.step, music.next, len);
-      music.step = (music.step + 1) % MELODY.length;
-      music.next += len;
-    }
-  }
+  // ================= sound =================
+  // Everything is synthesised live with Web Audio (no audio files): two original music loops and machine sounds.
+  const snd = {
+    track: ['calm', 'claw', 'off'].includes(store.get('edu-track')) ? store.get('edu-track') : (store.get('edu-music') === '0' ? 'off' : 'calm'),
+    last: 'calm', sfx: store.get('edu-sfx') !== '0',
+  };
+  if (snd.track !== 'off') snd.last = snd.track;
+  const au = { ac: null, music: null, sfx: null, noise: null, motorT: null, motorH: null };
+  const seq = { step: 0, next: 0, timer: null };
+
   // iPhone mutes Web Audio when the ring/silent switch is off unless a media element is playing,
   // so a silent looping <audio> runs alongside (and Safari 17+ is told this is playback audio).
   let unlockEl = null;
@@ -457,69 +522,225 @@
     let bin = ''; for (const b of buf) bin += String.fromCharCode(b);
     return 'data:audio/wav;base64,' + btoa(bin);
   }
-  function unlockIOS() {
+  function ensureAudio() {
+    if (document.hidden) return false;
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
     try {
       if (!unlockEl) { unlockEl = new Audio(silentWav()); unlockEl.loop = true; unlockEl.setAttribute('playsinline', ''); }
       const pr = unlockEl.play(); if (pr && pr.catch) pr.catch(() => {});
     } catch (e) {}
+    try {
+      if (!au.ac) {
+        au.ac = new (window.AudioContext || window.webkitAudioContext)();
+        au.music = au.ac.createGain(); au.music.gain.value = 0.6; au.music.connect(au.ac.destination);
+        au.sfx = au.ac.createGain(); au.sfx.gain.value = 0.8; au.sfx.connect(au.ac.destination);
+        au.noise = au.ac.createBuffer(1, au.ac.sampleRate, au.ac.sampleRate);
+        const d = au.noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      if (au.ac.state !== 'running') { const pr = au.ac.resume(); if (pr && pr.catch) pr.catch(() => {}); }
+      return true;
+    } catch (e) { return false; }
+  }
+  function tone(midi, t, dur, type, vol, attack = 0.012, out = au.music) {
+    const o = au.ac.createOscillator(), g = au.ac.createGain();
+    o.type = type; o.frequency.value = 440 * 2 ** ((midi - 69) / 12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.03);
+  }
+  function noiseHit(t, freq, dur, vol, type = 'bandpass', out = au.sfx) {
+    const src = au.ac.createBufferSource(), f = au.ac.createBiquadFilter(), g = au.ac.createGain();
+    src.buffer = au.noise; f.type = type; f.frequency.value = freq; f.Q.value = 1.2;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(out); src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+  }
+  function thump(t, f, dur, vol) {
+    const o = au.ac.createOscillator(), g = au.ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.45, t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(au.sfx); o.start(t); o.stop(t + dur + 0.02);
+  }
+
+  // Track 1 "관제실": slow, calm control-room loop (Am F C G), soft pads under a plucked arpeggio.
+  const CALM = [[57, 60, 64], [53, 57, 60], [55, 60, 64], [55, 59, 62]];
+  const CALM_BASS = [45, 41, 48, 43];
+  function playCalm(i, t, len) {
+    const ch = CALM[i >> 4], root = CALM_BASS[i >> 4];
+    if (i % 16 === 0) {
+      for (const n of ch) tone(n, t, len * 17, 'sine', 0.05, 0.7);
+      tone(root + 12, t, len * 16, 'triangle', 0.1, 0.25);
+    }
+    if (i % 2 === 0) tone(ch[(i >> 1) % 3] + 12, t, len * 3, 'triangle', 0.045);
+    if (i % 16 === 14) tone(ch[2] + 24, t, len * 5, 'sine', 0.025, 0.02);
+  }
+  // Track 2 "인형뽑기": bouncy claw-machine chiptune (original melody).
+  const MELODY = [
+    76, 79, 84, 79, 76, 79, 84, null,   74, 77, 81, 77, 74, 77, 81, null,
+    76, 79, 84, 88, 86, 84, 81, 79,     77, 81, 79, 76, 74, null, 72, null,
+    81, 84, 81, 79, 76, 79, 81, null,   79, 76, 74, 76, 79, null, null, null,
+    84, 83, 81, 79, 81, 83, 84, 86,     88, 84, 79, 76, 72, null, null, null,
+  ];
+  const BASS_ROOTS = [48, 50, 48, 43, 45, 52, 41, 48];
+  const BASS_STEPS = [0, 12, 7, 12, 0, 12, 7, 12];
+  function playClaw(i, t, len) {
+    const m = MELODY[i];
+    if (m != null) { tone(m, t, len * 0.85, 'square', 0.1); tone(m + 12, t, len * 1.6, 'sine', 0.05); }
+    tone(BASS_ROOTS[i >> 3] + 12 + BASS_STEPS[i & 7], t, len * 0.8, 'triangle', 0.2);
+    if (i & 1) noiseHit(t, 8000, 0.04, 0.05, 'highpass', au.music);
+  }
+  function schedule() {
+    if (!au.ac) return;
+    const calm = snd.track === 'calm', len = calm ? 60 / 84 / 2 : 60 / 140 / 2;
+    while (seq.next < au.ac.currentTime + 0.15) {
+      (calm ? playCalm : playClaw)(seq.step, seq.next, len);
+      seq.step = (seq.step + 1) % 64;
+      seq.next += len;
+    }
   }
   function musicStart() {
-    if (!music.on || document.hidden) return;
-    unlockIOS();
-    try {
-      if (!music.ac) {
-        music.ac = new (window.AudioContext || window.webkitAudioContext)();
-        music.out = music.ac.createGain(); music.out.gain.value = 0.7; music.out.connect(music.ac.destination);
-        music.noise = music.ac.createBuffer(1, music.ac.sampleRate * 0.1, music.ac.sampleRate);
-        const d = music.noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      }
-      if (music.ac.state !== 'running') { const pr = music.ac.resume(); if (pr && pr.catch) pr.catch(() => {}); }
-      if (!music.timer) { music.next = music.ac.currentTime + 0.05; music.timer = setInterval(schedule, 25); }
-    } catch (e) {}
+    if (snd.track === 'off' || !ensureAudio()) return;
+    if (!seq.timer) { seq.step = 0; seq.next = au.ac.currentTime + 0.05; seq.timer = setInterval(schedule, 25); }
   }
-  function musicStop() {
-    clearInterval(music.timer); music.timer = null;
-    try { if (music.ac) music.ac.suspend(); } catch (e) {}
-    try { if (unlockEl) unlockEl.pause(); } catch (e) {}
+  function musicStop() { clearInterval(seq.timer); seq.timer = null; }
+  function setTrack(tr) {
+    snd.track = tr; if (tr !== 'off') snd.last = tr;
+    store.set('edu-track', tr);
+    musicStop(); musicStart(); renderSound();
   }
-  function renderMusicBtns() {
-    for (const b of document.querySelectorAll('.music-btn')) { b.setAttribute('aria-pressed', String(music.on)); b.textContent = b.closest('.hud') ? '♪' : music.on ? '♪ 음악 켬' : '♪ 음악 끔'; }
+
+  // Machine sounds
+  const sfxReady = () => snd.sfx && ensureAudio();
+  function sfxTwl(lock) {
+    if (!sfxReady()) return;
+    const t = au.ac.currentTime;
+    noiseHit(t, lock ? 2200 : 3200, 0.07, 0.55); thump(t, lock ? 150 : 190, 0.1, 0.4);
+    noiseHit(t + 0.08, lock ? 1500 : 2400, 0.05, 0.35); thump(t + 0.08, lock ? 100 : 130, 0.08, 0.3);
   }
-  for (const b of document.querySelectorAll('.music-btn')) b.addEventListener('click', () => {
-    music.on = !music.on;
-    try { localStorage.setItem('edu-music', music.on ? '1' : '0'); } catch (e) {}
-    music.on ? musicStart() : musicStop();
-    renderMusicBtns();
+  function sfxLand() { if (!sfxReady()) return; const t = au.ac.currentTime; thump(t, 80, 0.25, 0.55); noiseHit(t, 350, 0.18, 0.3, 'lowpass'); }
+  function sfxAlarm() {
+    if (!sfxReady()) return;
+    const t = au.ac.currentTime;
+    tone(81, t, 0.12, 'square', 0.09, 0.005, au.sfx); tone(76, t + 0.14, 0.12, 'square', 0.09, 0.005, au.sfx);
+  }
+  function sfxChime() {
+    if (!sfxReady()) return;
+    const t = au.ac.currentTime;
+    tone(79, t, 0.35, 'sine', 0.13, 0.005, au.sfx); tone(86, t + 0.09, 0.35, 'sine', 0.11, 0.005, au.sfx); tone(91, t + 0.18, 0.45, 'sine', 0.09, 0.005, au.sfx);
+  }
+  // Trolley and hoist motor hum follow the lever speed.
+  function motors(vt, vh) {
+    if (!au.ac || au.ac.state !== 'running') return;
+    const on = snd.sfx && G && G.manual && !G.done && $('home').hidden && $('result').hidden;
+    const mk = (type, cut) => {
+      const o = au.ac.createOscillator(), f = au.ac.createBiquadFilter(), g = au.ac.createGain();
+      o.type = type; f.type = 'lowpass'; f.frequency.value = cut; g.gain.value = 0;
+      o.connect(f).connect(g).connect(au.sfx); o.start();
+      return { o, g };
+    };
+    if (!au.motorT) { au.motorT = mk('sawtooth', 420); au.motorH = mk('square', 650); }
+    const t = au.ac.currentTime;
+    au.motorT.o.frequency.setTargetAtTime(48 + Math.abs(vt) * 0.35, t, 0.05);
+    au.motorT.g.gain.setTargetAtTime(on ? Math.min(1, Math.abs(vt) / 150) * 0.07 : 0, t, 0.06);
+    au.motorH.o.frequency.setTargetAtTime(90 + Math.abs(vh) * 45, t, 0.05);
+    au.motorH.g.gain.setTargetAtTime(on ? Math.min(1, Math.abs(vh) / 2.4) * 0.045 : 0, t, 0.06);
+  }
+
+  function renderSound() {
+    for (const b of document.querySelectorAll('[data-track]')) b.setAttribute('aria-pressed', String(b.dataset.track === snd.track));
+    for (const b of document.querySelectorAll('[data-sfx]')) b.setAttribute('aria-pressed', String((b.dataset.sfx === 'on') === snd.sfx));
+    $('music-btn').setAttribute('aria-pressed', String(snd.track !== 'off'));
+  }
+  for (const b of document.querySelectorAll('[data-track]')) b.addEventListener('click', () => setTrack(b.dataset.track));
+  for (const b of document.querySelectorAll('[data-sfx]')) b.addEventListener('click', () => {
+    snd.sfx = b.dataset.sfx === 'on'; store.set('edu-sfx', snd.sfx ? '1' : '0');
+    if (snd.sfx) { ensureAudio(); sfxTwl(true); }
+    renderSound();
   });
-  // Browsers only allow sound after the first tap or key press.
-  for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, musicStart, true);
-  document.addEventListener('visibilitychange', () => { document.hidden ? musicStop() : musicStart(); });
-  renderMusicBtns();
+  $('music-btn').addEventListener('click', () => setTrack(snd.track === 'off' ? snd.last : 'off'));
+  // Phones only allow sound once a finger lifts (touchend / pointerup / click), never on pointerdown.
+  const audioGesture = () => { if (snd.sfx) ensureAudio(); musicStart(); };
+  for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, audioGesture, true);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { musicStop(); try { au.ac && au.ac.suspend(); unlockEl && unlockEl.pause(); } catch (e) {} }
+    else audioGesture();
+  });
 
   // ================= state =================
   const cvs = $('c'), ctx = cvs.getContext('2d');
-  let scale = 1, LH = 500, L = null, G = null, ox = 0, VX0 = 0, VW = LW;
+  let scale = 1, dpr = 1, LH = 500, L = null, G = null, ox = 0, VX0 = 0, VW = LW;
   const held = { left: false, right: false, up: false, down: false };
-  const stick = { x: 0, y: 0 }; // on-screen joystick deflection, -1..1
+  const stick = { x: 0, y: 0 }; // on-screen lever deflection, -1..1
   let lockQueued = false, gpPrevA = false;
-  const crane = { x: 0, q: [], carrying: null, wait: 0 };
+  const crane = { x: 0, q: [], carrying: null };
   const truck = { off: 0, state: 'idle', box: null, cb: null };
-  let sel = { game: store.get('edu-game') === 'ship' ? 'ship' : 'yard', diff: ['easy', 'normal', 'hard'].includes(store.get('edu-diff')) ? store.get('edu-diff') : 'easy', ctrl: store.get('edu-ctrl') === 'tap' ? 'tap' : 'pad' };
+  const pickStored = (k, list, dflt) => (list.includes(store.get(k)) ? store.get(k) : dflt);
+  const sel = {
+    game: pickStored('edu-game', ['yard', 'ship'], 'yard'),
+    diff: pickStored('edu-diff', ['easy', 'normal', 'hard'], 'easy'),
+    ctrl: pickStored('edu-ctrl', ['pad', 'tap'], 'pad'),
+    env: pickStored('edu-env', ['day', 'night', 'rain'], 'day'),
+  };
   const bestKey = (g, d) => `edu-best-${g}-${d}`;
+
+  // ================= textures =================
+  const TEX = {};
+  function makeTex(name, size, paint) {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    paint(c.getContext('2d'), size);
+    TEX[name] = c;
+    TEX[name + 'P'] = ctx.createPattern(c, 'repeat');
+  }
+  function speckle(g, s, n, lo, span, aMin, aSpan) {
+    for (let i = 0; i < n; i++) {
+      const v = lo + rand(span);
+      g.fillStyle = `rgba(${v},${v},${v + 3},${aMin + Math.random() * aSpan})`;
+      g.fillRect(Math.random() * s, Math.random() * s, 1 + rand(2) * 0.5, 1);
+    }
+  }
+  function initTextures() {
+    makeTex('asphalt', 120, (g, s) => {
+      g.fillStyle = '#55585c'; g.fillRect(0, 0, s, s);
+      speckle(g, s, 1400, 40, 90, 0.25, 0.4);
+      for (let i = 0; i < 4; i++) { g.fillStyle = 'rgba(18,18,20,.07)'; g.beginPath(); g.ellipse(Math.random() * s, Math.random() * s, 8 + Math.random() * 16, 4 + Math.random() * 8, Math.random() * 3, 0, 7); g.fill(); }
+    });
+    makeTex('concrete', 96, (g, s) => {
+      g.fillStyle = '#8b8d90'; g.fillRect(0, 0, s, s);
+      speckle(g, s, 900, 100, 70, 0.2, 0.35);
+      g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(0, s / 2 - 0.5, s, 1); g.fillRect(s / 2 - 0.5, 0, 1, s);
+    });
+    makeTex('steel', 64, (g, s) => {
+      g.fillStyle = '#6b7077'; g.fillRect(0, 0, s, s);
+      speckle(g, s, 400, 80, 60, 0.15, 0.3);
+      g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(0, s - 1, s, 1); g.fillRect(s / 2, 0, 1, s);
+      g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(0, 0, s, 1);
+    });
+    makeTex('water', 128, (g, s) => {
+      g.fillStyle = '#163646'; g.fillRect(0, 0, s, s);
+      g.strokeStyle = 'rgba(160,200,220,.08)'; g.lineWidth = 1;
+      for (let i = 0; i < 26; i++) { const x = Math.random() * s, y = Math.random() * s; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 8, y - 3, x + 18, y); g.stroke(); }
+    });
+    makeTex('grain', 160, (g, s) => {
+      const im = g.createImageData(s, s);
+      for (let i = 0; i < im.data.length; i += 4) { const v = rand(256); im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; }
+      g.putImageData(im, 0, 0);
+    });
+    makeTex('scan', 3, (g) => { g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 2, 3, 1); });
+  }
 
   // ================= layout =================
   function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = cvs.clientWidth, h = cvs.clientHeight;
     if (!w || !h) return;
     cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr);
     // Fit the 360-wide work area; extra width (landscape) widens the view around it.
     scale = Math.min(w / LW, h / 400); LH = h / scale;
     VW = w / scale; ox = (VW - LW) / 2; VX0 = -ox;
-    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * scale * ox, 0);
+    worldTransform();
     if (G) computeLayout();
   }
+  const worldTransform = () => ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * scale * ox, 0);
   function computeLayout() {
     const R = G.R, margin = 14, gap = 20;
     const colW = (LW - margin * 2 - gap) / (R + 1);
@@ -534,7 +755,7 @@
       laneX = margin + colW * 0.5;
       for (let r = 0; r < R; r++) rowX.push(margin + gap + colW * (r + 1.5));
     }
-    L = { colW, cw, cl, rowX, laneX, bayY: LH * (G.manual ? 0.42 : 0.47), bayGap: cl + 66, margin, gap };
+    L = { colW, cw, cl, rowX, laneX, bayY: LH * (G.manual ? 0.43 : 0.47), bayGap: cl + 66, margin, gap };
     if (!crane.q.length) crane.x = crane.carrying ? crane.x : laneX;
   }
   function hitCol(x) {
@@ -558,19 +779,24 @@
     used.clear();
     const kind = sel.game, diff = sel.diff;
     const cfg = (kind === 'yard' ? YARD : SHIP)[diff];
-    G = { kind, diff, cfg, R: cfg.rows, T: cfg.tiers, score: 100, pen: [], moves: 0, t0: now(), floats: [], done: false,
-          msg: '', msgKind: 'info', manual: sel.ctrl === 'pad' };
-    G.m = { hb: cfg.tiers + 1.7, vx: 0, vh: 0, landed: false, aligned: null, colliding: false };
+    G = { kind, diff, cfg, R: cfg.rows, T: cfg.tiers, score: 100, pen: [], moves: 0, t0: now(), floats: [], fx: [], log: [],
+          done: false, manual: sel.ctrl === 'pad', env: sel.env, alarmT: -1e9 };
+    G.m = { hb: cfg.tiers + 1.7, vx: 0, vh: 0, sw: 0, swv: 0, landed: false, aligned: null, colliding: false };
+    G.stains = Array.from({ length: 14 }, () => ({ x: -260 + Math.random() * 880, y: Math.random() * 1100, rx: 6 + Math.random() * 18, ry: 3 + Math.random() * 7, r: Math.random() * 3 }));
+    G.rain = Array.from({ length: 110 }, () => ({ x: Math.random(), y: Math.random(), l: 8 + Math.random() * 14, s: 0.9 + Math.random() * 0.6 }));
+    G.drops = Array.from({ length: 16 }, () => ({ x: Math.random(), y: Math.random(), r: 3 + Math.random() * 9 }));
     crane.q = []; crane.carrying = null;
     $('pad').hidden = !G.manual;
     if (kind === 'yard') setupYard(); else setupShip();
     $('home').hidden = true; $('result').hidden = true;
     resize(); computeLayout(); crane.x = L.laneX;
-    $('hud-title').innerHTML = `${kind === 'yard' ? '야드 이적·반출' : '본선 선적'}<small>${{ easy: '초보', normal: '중수', hard: '고수' }[diff]}</small>`;
+    $('hud-eq').textContent = kind === 'yard' ? 'RTG-07' : 'STS-03';
+    $('hud-title').textContent = kind === 'yard' ? '야드 이적·반출' : '본선 선적';
+    $('hud-diff').textContent = DIFF_NAME[diff];
     $('hud-time-label').textContent = kind === 'yard' ? '트럭 대기' : '경과';
     if (G.manual) say(G.kind === 'yard'
-      ? '왼쪽 조이스틱으로 트롤리를 대상 열 위에 맞추고, 오른쪽 조이스틱을 아래로 당겨 착지하면 잠금을 누르세요. 옮길 때는 위로 밀어 충분히 올리세요.'
-      : '왼쪽 조이스틱으로 트롤리를 트럭 위에 맞추고, 오른쪽 조이스틱을 아래로 당겨 잠금. 위로 올려 실을 열로 옮긴 뒤 내려서 해제하세요.', 'info');
+      ? '왼쪽 레버로 트롤리를 대상 열 위에 맞추고, 오른쪽 레버를 당겨 내려 착지하면 잠금. 옮길 때는 레버를 밀어 충분히 올리세요.'
+      : '왼쪽 레버로 트롤리를 트럭 위에 맞추고, 오른쪽 레버를 당겨 내려 잠금. 올린 뒤 실을 열로 옮겨 내리고 해제하세요.', 'info');
     renderVMT(); updateHud();
   }
 
@@ -587,7 +813,7 @@
     G.orders = shuffle(all.slice(0, cfg.orders)).map((x) => ({ box: x.b, done: false, truck: plate(), wait: 0 }));
     G.oi = 0; G.truckT0 = now(); G.src = -1; G.srcBlocking = false;
     truck.box = null; truck.off = 0; truck.state = 'idle';
-    say(`반출 오더 ${G.orders.length}건이 들어왔습니다. 첫 번째 트럭이 차선에 대기 중입니다.`, 'info');
+    say(`반출 오더 ${G.orders.length}건 수신. 첫 번째 트럭이 차선에 대기 중입니다.`, 'info');
   }
 
   function setupShip() {
@@ -604,11 +830,20 @@
     G.total = cfg.count; G.loaded = 0;
     G.neighbors = [-2, -1, 1, 2].map((k) => ({ k, stacks: Array.from({ length: R }, () => Array.from({ length: rand(3) }, () => makeBox({ pod: rand(3), w: 14 }))) }));
     truck.off = 0; truck.state = 'idle'; truck.box = G.queue[0];
-    say('선적 순서대로 컨테이너가 도착합니다. 실을 열을 누르세요. 다음 두 개도 미리 확인할 수 있어요.', 'info');
+    say('선적 순서대로 컨테이너가 도착합니다. 다음 두 개도 미리 확인할 수 있어요.', 'info');
   }
 
   // ================= messages / scoring =================
-  function say(text, kind = 'info') { G.msg = text; G.msgKind = kind; const m = document.querySelector('.msg'); if (m) { m.textContent = text; m.className = 'msg ' + kind; } }
+  // The terminal keeps a short event log, newest first, like a TOS alarm list.
+  function say(text, kind = 'info') {
+    if (!G) return;
+    if (G.log[0] && G.log[0].text === text) return;
+    G.log.unshift({ t: clock(), text, kind });
+    G.log.length = Math.min(G.log.length, 4);
+    renderLog();
+  }
+  const logHTML = () => G.log.slice(0, 3).map((e) => `<div class="${e.kind === 'bad' ? 'alarm' : e.kind}"><time>${e.t}</time><span>${e.text}</span></div>`).join('');
+  function renderLog() { const el = $('vmt-log'); if (el) el.innerHTML = logHTML(); }
   function float(col, text, kind) {
     const x = col === 'lane' ? L.laneX : L.rowX[col];
     G.floats.push({ x, y: L.bayY - L.cl / 2 - 10, text, kind, life: 1 });
@@ -616,12 +851,18 @@
   function penalize(type, pts, col) {
     G.score = Math.max(0, G.score - pts);
     G.pen.push({ type, pts });
+    G.alarmT = now();
     float(col, `−${pts}`, 'bad');
-    buzz(40);
+    buzz(40); sfxAlarm();
     updateHud();
   }
-  function updateHud() {
-    $('hud-score').textContent = G ? G.score : 100;
+  function updateHud() { $('hud-score').textContent = G ? G.score : 100; }
+  // Twistlock and dust effects at a column; h is the height of the surface the spreader sits on.
+  function fxAt(col, h, lock) {
+    const x = col === 'lane' ? L.laneX : L.rowX[col];
+    G.fx.push({ type: 'twl', x, h, lock, t: 0 });
+    if (!lock) G.fx.push({ type: 'dust', x, h: h - 1, t: 0 });
+    sfxTwl(lock); if (!lock) sfxLand();
   }
 
   // ================= yard play =================
@@ -651,32 +892,31 @@
     go(L.rowX[r], () => doYardPlace(r));
   }
 
-  function doYardGate() { truck.box = crane.carrying; crane.carrying = null; gateOut(); }
+  function doYardGate() { fxAt('lane', 1.45, false); truck.box = crane.carrying; crane.carrying = null; gateOut(); }
   function doYardPick(r) {
     const st = G.stacks[r], tgt = curTarget();
+    fxAt(r, st.length, true);
     crane.carrying = st.pop(); G.src = r; G.srcBlocking = st.includes(tgt);
-    const lane = G.manual ? '트럭 위로 옮겨 내린 뒤 해제하세요' : '오른쪽 트럭 차선을 눌러 상차하세요';
+    const lane = G.manual ? '트럭 위로 옮겨 내린 뒤 해제하세요' : '트럭 차선을 눌러 상차하세요';
     if (crane.carrying === tgt) say(`반출 대상을 집었습니다. ${lane}.`, 'good');
     else if (G.srcBlocking) say('반출 대상 위의 컨테이너를 집었습니다. 다음 반출 예정이 없는 열에 이적하세요.', 'info');
     else say(`이 열에는 반출 대상이 없습니다. ${G.manual ? '같은 열에 다시 내려놓으면' : '같은 열을 다시 누르면'} 감점 없이 제자리로 돌아갑니다.`, 'bad');
     renderVMT();
   }
-  function doYardPutBack(r) { G.stacks[r].push(crane.carrying); crane.carrying = null; say('제자리에 내려놓았습니다.', 'info'); renderVMT(); }
+  function doYardPutBack(r) { G.stacks[r].push(crane.carrying); crane.carrying = null; fxAt(r, G.stacks[r].length, false); say('제자리에 내려놓았습니다.', 'info'); renderVMT(); }
   function doYardPlace(r) {
     const st = G.stacks[r], tgt = curTarget();
-    {
-      const b = crane.carrying; crane.carrying = null; G.moves++;
-      let bad = false;
-      if (b === tgt || !G.srcBlocking) { penalize('unneeded', 5, r); bad = true; }
-      if (st.includes(tgt)) { penalize('buryCurrent', 10, r); bad = true; }
-      else if (st.some(isFuture)) { penalize('buryFuture', 8, r); bad = true; }
-      st.push(b);
-      if (!bad) { say(`${pad2(r + 1)}열 ${st.length}단에 이적했습니다. 다음 반출에 방해되지 않는 좋은 위치예요.`, 'good'); float(r, '좋아요', 'good'); }
-      else say(PEN[G.pen[G.pen.length - 1].type].tip, 'bad');
-      const p = findBox(tgt);
-      if (p && p.above === 0) say(G.msg + ' 이제 반출 대상이 맨 위에 있습니다.', G.msgKind);
-      renderVMT();
-    }
+    const b = crane.carrying; crane.carrying = null; G.moves++;
+    let bad = false;
+    if (b === tgt || !G.srcBlocking) { penalize('unneeded', 5, r); bad = true; }
+    if (st.includes(tgt)) { penalize('buryCurrent', 10, r); bad = true; }
+    else if (st.some(isFuture)) { penalize('buryFuture', 8, r); bad = true; }
+    st.push(b);
+    fxAt(r, st.length, false);
+    const p = findBox(tgt), topNote = p && p.above === 0 ? ' 이제 반출 대상이 맨 위에 있습니다.' : '';
+    if (!bad) { say(`${pad2(r + 1)}열 ${st.length}단에 이적. 다음 반출에 방해되지 않는 좋은 위치예요.${topNote}`, 'good'); float(r, 'OK', 'good'); }
+    else say(PEN[G.pen[G.pen.length - 1].type].tip + topNote, 'bad');
+    renderVMT();
   }
 
   const waitLimit = () => G.cfg.waitLimit * (G.manual ? 2 : 1);
@@ -685,7 +925,7 @@
     o.done = true; o.wait = (now() - G.truckT0) / 1000;
     if (waitLimit() && o.wait > waitLimit()) penalize('wait', 10, 'lane');
     say(`반출 완료. ${o.truck} 트럭 출발 (대기 ${fmtTime(o.wait)}).`, 'good');
-    float('lane', '반출', 'good'); buzz(15);
+    float('lane', 'GATE OUT', 'good'); buzz(15); sfxChime();
     renderVMT();
     truckMove('out', () => {
       truck.box = null; G.oi++;
@@ -716,39 +956,39 @@
     go(L.rowX[r], () => doShipPlace(r));
   }
   function doShipPick() {
+    fxAt('lane', 1.45, true);
     crane.carrying = G.queue.shift(); truck.box = null;
     truckMove('out', () => { if (G.queue.length) truckArrive(G.queue[0], () => renderVMT()); });
     renderVMT();
   }
   function doShipPlace(r) {
     const st = G.stacks[r];
-    {
-      const b = crane.carrying; crane.carrying = null;
-      const below = st[st.length - 1];
-      let bad = false;
-      if (st.some((x) => x.pod < b.pod)) {
-        penalize('overstow', 15, r); bad = true;
-        const early = st.find((x) => x.pod < b.pod);
-        say(`Overstow: ${PORTS[b.pod].name}행이 ${PORTS[early.pod].name}행 위에 실렸습니다. ${PORTS[early.pod].name}에서 restow가 필요합니다.`, 'bad');
-      }
-      if (G.cfg.weights && below && below.w < b.w) {
-        penalize('weight', 8, r);
-        if (!bad) say(`중량 역적재: ${b.w}t 컨테이너가 ${below.w}t 위에 실렸습니다. 무거운 것은 아래로.`, 'bad');
-        bad = true;
-      }
-      if (b.reefer && !G.plug.includes(r)) {
-        penalize('reefer', 15, r);
-        if (!bad) say('냉동 컨테이너를 플러그가 없는 열에 실었습니다. 파란 점선 열이 리퍼 슬롯입니다.', 'bad');
-        bad = true;
-      }
-      st.push(b); G.loaded++;
-      if (!bad) { say(`${PORTS[b.pod].name}행 ${b.no}, 13-${G.labels[r]}-${82 + (st.length - 1) * 2} 적재 완료.`, 'good'); float(r, '적재', 'good'); }
-      if (!G.queue.length) finish();
-      renderVMT();
+    const b = crane.carrying; crane.carrying = null;
+    const below = st[st.length - 1];
+    let bad = false;
+    if (st.some((x) => x.pod < b.pod)) {
+      penalize('overstow', 15, r); bad = true;
+      const early = st.find((x) => x.pod < b.pod);
+      say(`Overstow: ${PORTS[b.pod].name}행이 ${PORTS[early.pod].name}행 위에 실렸습니다. ${PORTS[early.pod].name}에서 restow가 필요합니다.`, 'bad');
     }
+    if (G.cfg.weights && below && below.w < b.w) {
+      penalize('weight', 8, r);
+      if (!bad) say(`중량 역적재: ${b.w}t 컨테이너가 ${below.w}t 위에 실렸습니다. 무거운 것은 아래로.`, 'bad');
+      bad = true;
+    }
+    if (b.reefer && !G.plug.includes(r)) {
+      penalize('reefer', 15, r);
+      if (!bad) say('냉동 컨테이너를 플러그가 없는 열에 실었습니다. 파란 점선 열이 리퍼 슬롯입니다.', 'bad');
+      bad = true;
+    }
+    st.push(b); G.loaded++;
+    fxAt(r, st.length, false);
+    if (!bad) { say(`${PORTS[b.pod].name}행 ${b.no}, 13-${G.labels[r]}-${82 + (st.length - 1) * 2} 적재 완료.`, 'good'); float(r, 'OK', 'good'); }
+    if (!G.queue.length) finish();
+    renderVMT();
   }
 
-  // ================= manual (controller) operation =================
+  // ================= manual (lever) operation =================
   const HMAX = () => G.T + 1.7;
   function columns() { const a = G.stacks.map((s, r) => ({ col: r, x: L.rowX[r] })); a.push({ col: 'lane', x: L.laneX }); return a; }
   function colHeight(col) {
@@ -758,6 +998,7 @@
   function obstacleAt(x) { let h = 0; for (const c of columns()) if (Math.abs(x - c.x) < L.cw * 0.96) h = Math.max(h, colHeight(c.col)); return h; }
   function alignedCol(x) { for (const c of columns()) if (Math.abs(x - c.x) <= MAN[G.diff].tol) return c.col; return null; }
   const colX = (col) => (col === 'lane' ? L.laneX : L.rowX[col]);
+  const spreaderX = () => crane.x + (G.manual ? G.m.sw : 0);
 
   function readGamepad() {
     try {
@@ -778,38 +1019,48 @@
   }
 
   function manualUpdate(dt) {
-    const m = G.m, cfg = MAN[G.diff];
+    const m = G.m, cfg = MAN[G.diff], rain = G.env === 'rain';
     let ax = (held.right ? 1 : 0) - (held.left ? 1 : 0), ay = (held.down ? 1 : 0) - (held.up ? 1 : 0);
     if (stick.x) ax = stick.x;
     if (stick.y) ay = stick.y;
     const gp = readGamepad();
     if (gp) { if (gp.ax) ax = gp.ax; if (gp.ay) ay = gp.ay; }
     if (G.done) { ax = 0; ay = 0; }
-    m.vx += (ax * 150 - m.vx) * Math.min(1, dt * cfg.accel);
+    const prevVx = m.vx;
+    m.vx += (ax * 150 - m.vx) * Math.min(1, dt * cfg.accel * (rain ? 0.7 : 1));
     m.vh += (-ay * 2.4 - m.vh) * Math.min(1, dt * 12);
     // trolley travel, blocked if the load would hit a taller stack
     const xs = columns().map((c) => c.x);
     const nx = Math.max(Math.min(...xs) - L.colW * 0.45, Math.min(Math.max(...xs) + L.colW * 0.45, crane.x + m.vx * dt));
     if (Math.abs(nx - crane.x) > 1e-4) {
       const bottom = m.hb - (crane.carrying ? 1 : 0);
-      if (bottom < obstacleAt(nx) - 0.02) {
-        m.vx = 0;
+      if (bottom < obstacleAt(nx + m.sw) - 0.02) {
+        m.vx = 0; m.swv += (nx > crane.x ? -1 : 1) * 30;
         if (!m.colliding) {
           m.colliding = true; buzz(60);
           let near = 0; columns().forEach((c) => { if (Math.abs(nx - c.x) < Math.abs(nx - colX(near))) near = c.col; });
-          if (cfg.coll) penalize('collision', 2, near);
+          if (cfg.coll) penalize('collision', 2, near); else sfxAlarm();
           say('충돌 위험! 호이스트를 올린 뒤 트롤리를 옮기세요.', 'bad');
         }
       } else { crane.x = nx; m.colliding = false; }
     }
+    // Sway: the spreader hangs on ropes, so trolley acceleration swings it like a pendulum.
+    const acc = (m.vx - prevVx) / Math.max(dt, 1e-3);
+    const damp = m.landed ? 16 : cfg.damp * (rain ? 0.7 : 1);
+    m.swv += (-16 * m.sw - damp * m.swv - acc * 0.035) * dt;
+    m.sw = Math.max(-12, Math.min(12, m.sw + m.swv * dt));
     // hoist, stopping on whatever is below the spreader
-    const floor = obstacleAt(crane.x) + (crane.carrying ? 1 : 0);
+    const sx = crane.x + m.sw;
+    const floor = obstacleAt(sx) + (crane.carrying ? 1 : 0);
+    const wasLanded = m.landed;
     m.hb = Math.min(HMAX(), Math.max(floor, m.hb + m.vh * dt));
     if (m.hb <= floor + 1e-3 && m.vh < 0) m.vh = 0;
     m.landed = m.hb <= floor + 0.02;
-    m.aligned = alignedCol(crane.x);
+    if (m.landed && !wasLanded && floor > 0.3) { if (crane.carrying) sfxLand(); else if (sfxReady()) thump(au.ac.currentTime, 120, 0.08, 0.3); }
+    m.aligned = alignedCol(sx);
     if (lockQueued) { lockQueued = false; manualLock(); }
-    updateLockBtn();
+    updateControls();
+    motors(m.vx, m.vh);
   }
 
   function manualLock() {
@@ -817,8 +1068,8 @@
     if (G.done) return;
     if (!m.landed) { say('스프레더가 컨테이너에 닿을 때까지 호이스트를 내리세요.', 'info'); return; }
     const col = m.aligned;
-    if (col == null) { say('정렬 불량: 트롤리를 열 중앙에 맞춘 뒤 다시 내리세요.', 'bad'); buzz(20); return; }
-    crane.x = colX(col); // twistlocks guide the spreader into the corner castings
+    if (col == null) { say('정렬 불량: 흔들림이 멈춘 뒤 트롤리를 열 중앙에 맞추세요.', 'bad'); buzz(20); sfxAlarm(); return; }
+    crane.x = colX(col); m.sw = 0; m.swv = 0; // twistlocks guide the spreader into the corner castings
     const full = col !== 'lane' && G.stacks[col].length >= G.T;
     if (G.kind === 'yard') {
       if (!crane.carrying) {
@@ -844,7 +1095,8 @@
     buzz(12);
   }
 
-  function updateLockBtn() {
+  function setCls(el, cls) { if (el.className !== cls) el.className = cls; }
+  function updateControls() {
     const b = $('lockbtn'), m = G.m;
     let cls = '', sub;
     if (!m.landed) sub = '착지 전';
@@ -852,7 +1104,10 @@
     else { sub = crane.carrying ? 'UNLOCK' : 'LOCK'; cls = crane.carrying ? ' release' : ' ready'; }
     const html = `${crane.carrying ? '해제' : '잠금'}<small>${sub}</small>`;
     if (b.dataset.h !== html) { b.innerHTML = html; b.dataset.h = html; }
-    if (b.className !== 'lockbtn' + cls) b.className = 'lockbtn' + cls;
+    setCls(b, 'lockbtn' + cls);
+    setCls($('lamp-land'), m.landed ? 'w' : '');
+    setCls($('lamp-align'), m.aligned != null ? 'g' : '');
+    setCls($('lamp-lock'), crane.carrying ? 'g' : 'a');
   }
 
   // ================= finish / result =================
@@ -863,6 +1118,7 @@
     const k = bestKey(G.kind, G.diff);
     if (G.score > (+store.get(k) || 0)) store.set(k, G.score);
     G.elapsed = (now() - G.t0) / 1000;
+    say('작업 종료. 결과를 집계합니다.', 'good');
     renderVMT();
     setTimeout(showResult, 900);
   }
@@ -870,10 +1126,10 @@
   function showResult() {
     const s = G.score;
     const stars = s >= 90 ? 3 : s >= 70 ? 2 : s >= 40 ? 1 : 0;
-    $('r-eyebrow').textContent = `${G.kind === 'yard' ? '야드 이적·반출' : '본선 선적'} · ${{ easy: '초보', normal: '중수', hard: '고수' }[G.diff]}`;
+    $('r-eyebrow').textContent = `${G.kind === 'yard' ? 'RTG-07 · 야드 이적·반출' : 'STS-03 · 본선 선적'} · ${DIFF_NAME[G.diff]} · ${{ day: '주간', night: '야간', rain: '우천' }[G.env]}`;
     $('r-title').textContent = s >= 90 ? '깔끔한 작업이었어요' : s >= 70 ? '작업 완료' : '작업 완료, 복기가 필요해요';
     $('r-score').textContent = s;
-    $('r-stars').innerHTML = '★'.repeat(stars) + '<i>' + '★'.repeat(3 - stars) + '</i>';
+    $('r-grade').innerHTML = [0, 1, 2].map((i) => `<i class="${i < stars ? 'on' : ''}"></i>`).join('');
     const cnt = (t) => G.pen.filter((p) => p.type === t).length;
     let stats;
     if (G.kind === 'yard') {
@@ -896,110 +1152,120 @@
     $('result').hidden = false;
   }
 
-  // ================= VMT panel =================
+  // ================= VMT / TOS terminal =================
+  const sec = (title, right, body, cls = 'sec-b') => `<section class="sec"><div class="sec-h"><span>${title}</span>${right ? `<b>${right}</b>` : ''}</div><div class="${cls}">${body}</div></section>`;
   function renderVMT() {
     if (!G) return;
-    const v = $('vmt');
     let h = '';
     if (G.kind === 'yard') {
       const o = G.orders[G.oi], tgt = curTarget();
       const p = tgt && findBox(tgt);
-      h += `<div class="vmt-head"><span>VMT · RTG-07 · 블록 A03 베이 15</span><b>반출 ${Math.min(G.oi + 1, G.orders.length)}/${G.orders.length}</b></div>`;
+      let job;
       if (o && !o.done) {
-        const where = p ? `위치 <b>${yardLoc(p.r, p.i)}</b> · 위에 ${p.above}개` : '<b>스프레더에 있음</b> → 트럭 차선';
-        h += `<div class="job"><div class="job-label">반출<br>오더</div><div class="job-no">${tgt.no}</div><div class="job-loc">${where} · 트럭 ${o.truck}</div></div>`;
-      } else {
-        h += `<div class="job"><div class="job-label">완료</div><div class="job-no">반출 작업 종료</div><div class="job-loc">모든 트럭이 출발했습니다.</div></div>`;
-      }
-      h += `<div class="msg ${G.msgKind}">${G.msg}</div>`;
-      h += `<div class="bay"><div class="bay-title"><span>베이 단면 · A03-15</span><span>${crane.carrying ? '스프레더: ' + crane.carrying.no : '스프레더: 비어 있음'}</span></div>`;
-      h += `<div class="bay" style="grid-template-columns: 22px repeat(${G.R}, 1fr)">`;
+        const where = p ? `위치 <b>${yardLoc(p.r, p.i)}</b> · 위에 <b>${p.above}</b>개` : '<b>스프레더에 있음</b> → 트럭 차선';
+        job = `<div class="job"><div class="job-no">${tgt.no}</div><span class="tag">GATE OUT</span><div class="job-loc">${where} · ${tgt.type} · ${tgt.w}t<br>트럭 ${o.truck}</div></div>`;
+      } else job = '<div class="job"><div class="job-no">반출 작업 종료</div><span class="tag ok">DONE</span><div class="job-loc">모든 트럭이 출발했습니다.</div></div>';
+      h += sec('작업 지시 · RTG-07', `반출 ${Math.min(G.oi + 1, G.orders.length)}/${G.orders.length}`, job);
+      h += sec('이벤트 로그', '', logHTML(), 'log" id="vmt-log');
+      let grid = `<div class="grid" style="grid-template-columns: 20px repeat(${G.R}, 1fr)">`;
       for (let t = G.T - 1; t >= 0; t--) {
-        h += `<div class="lbl">${t + 1}</div>`;
+        grid += `<div class="lbl">${t + 1}</div>`;
         for (let r = 0; r < G.R; r++) {
           const b = G.stacks[r][t];
-          if (!b) { h += '<div class="cell"></div>'; continue; }
+          if (!b) { grid += '<div class="cell"></div>'; continue; }
           const oi = G.orders.findIndex((x) => x.box === b && !x.done);
-          const cls = ['cell', 'box', b.c === 2 ? 'navy' : '', b === tgt ? 'target' : oi > G.oi ? 'pending' : ''].join(' ');
-          h += `<div class="${cls}">${b.short}${oi >= 0 ? `<sup>${oi + 1}</sup>` : ''}</div>`;
+          const cls = ['cell', 'box', b === tgt ? 'target' : oi > G.oi ? 'pending' : ''].join(' ');
+          grid += `<div class="${cls}">${b.short}${oi >= 0 ? `<sup>${oi + 1}</sup>` : ''}</div>`;
         }
       }
-      h += '<div></div>';
-      for (let r = 0; r < G.R; r++) h += `<div class="lbl">${pad2(r + 1)}열</div>`;
-      h += '</div></div>';
-      h += '<div class="chips">' + G.orders.map((x, i) => `<span class="chip ${x.done ? 'done' : i === G.oi ? 'now' : ''}">${i + 1}. ${x.box.short} · ${x.truck}</span>`).join('') + '</div>';
+      grid += '<div></div>';
+      for (let r = 0; r < G.R; r++) grid += `<div class="lbl">${pad2(r + 1)}</div>`;
+      grid += '</div>';
+      h += sec('베이 단면 · A03-15', crane.carrying ? 'SPR ' + crane.carrying.short : 'SPR EMPTY', grid);
+      h += sec('트럭 대기열', '', '<div class="chips">' + G.orders.map((x, i) => `<span class="chip ${x.done ? 'done' : i === G.oi ? 'now' : ''}">${i + 1}. ${x.box.short} · ${x.truck}</span>`).join('') + '</div>');
     } else {
-      h += `<div class="vmt-head"><span>VMT · STS-03 · 베이 13 갑판</span><b>선적 ${G.loaded}/${G.total}</b></div>`;
       const q = [crane.carrying, ...G.queue].filter(Boolean).slice(0, 3);
       const podTag = (b) => `<span class="pod" style="background:${PORTS[b.pod].color}">${PORTS[b.pod].code}</span>`;
-      if (q.length) {
-        h += '<div class="queue">' + q.map((b, i) => `<div>${i === 0 ? '현재' : '다음'} ${podTag(b)} ${b.no}${G.cfg.weights ? ` · ${b.w}t` : ''}${b.reefer ? ' · 냉동 22R1' : ''}</div>`).join('') + '</div>';
-      } else h += '<div class="queue"><div>선적 작업 종료</div></div>';
-      h += `<div class="msg ${G.msgKind}">${G.msg}</div>`;
-      h += `<div class="bay"><div class="bay-title"><span>베이 플랜 · 13 갑판</span><span>항로: ${PORTS.slice(0, G.cfg.pods).map((p) => p.name).join(' → ')}</span></div>`;
-      h += `<div class="bay" style="grid-template-columns: 22px repeat(${G.R}, 1fr)">`;
+      const body = q.length
+        ? '<div class="queue">' + q.map((b, i) => `<div><em>${i === 0 ? 'NOW' : 'NEXT'}</em>${podTag(b)} ${b.no}${G.cfg.weights ? ` · ${b.w}t` : ''}${b.reefer ? ' · 22R1' : ''}</div>`).join('') + '</div>'
+        : '<div class="queue"><div>선적 작업 종료</div></div>';
+      h += sec('작업 지시 · STS-03', `선적 ${G.loaded}/${G.total}`, body);
+      h += sec('이벤트 로그', '', logHTML(), 'log" id="vmt-log');
+      let grid = `<div class="grid" style="grid-template-columns: 22px repeat(${G.R}, 1fr)">`;
       for (let t = G.T - 1; t >= 0; t--) {
-        h += `<div class="lbl">${82 + t * 2}</div>`;
+        grid += `<div class="lbl">${82 + t * 2}</div>`;
         for (let r = 0; r < G.R; r++) {
           const b = G.stacks[r][t];
           const plug = G.plug.includes(r) ? ' plug' : '';
-          h += b ? `<div class="cell${plug}" style="background:${PORTS[b.pod].color};color:#11131a">${PORTS[b.pod].code}${G.cfg.weights ? ' ' + b.w : ''}</div>` : `<div class="cell${plug}"></div>`;
+          grid += b ? `<div class="cell${plug}" style="background:${PORTS[b.pod].color};color:#111">${PORTS[b.pod].code}${G.cfg.weights ? ' ' + b.w : ''}</div>` : `<div class="cell${plug}"></div>`;
         }
       }
-      h += '<div></div>' + G.labels.map((l) => `<div class="lbl">${l}</div>`).join('') + '</div></div>';
-      const hv = heel(), lim = G.cfg.heelLimit || 2;
-      const pos = Math.max(0, Math.min(100, 50 + hv * 8));
-      h += `<div class="gauge"><span>좌현</span><div class="gauge-bar"><em style="left:${50 - lim * 8}%"></em><em style="left:${50 + lim * 8}%"></em><i style="left:${pos}%"></i></div><span>우현</span></div>`;
-      h += `<div class="chips"><span class="chip">횡경사 ${Math.abs(hv).toFixed(1)}°${G.cfg.heelLimit ? ` (한도 ${G.cfg.heelLimit}°)` : ''}</span>${G.plug.length ? '<span class="chip">파란 점선 = 리퍼 플러그 열</span>' : ''}</div>`;
+      grid += '<div></div>' + G.labels.map((l) => `<div class="lbl">${l}</div>`).join('') + '</div>';
+      const hv = heel(), lim = G.cfg.heelLimit || 2, sc = 8;
+      const pos = Math.max(0, Math.min(100, 50 + hv * sc)), over = G.cfg.heelLimit && Math.abs(hv) > G.cfg.heelLimit;
+      grid += `<div class="gauge"><span>좌현</span><div class="gauge-bar"><span class="zone" style="left:${50 - lim * sc}%;right:${50 - lim * sc}%"></span><i class="${over ? 'over' : ''}" style="left:${pos}%"></i></div><span>우현</span></div>`;
+      grid += `<div class="chips"><span class="chip">HEEL ${Math.abs(hv).toFixed(1)}°${G.cfg.heelLimit ? ` / 한도 ${G.cfg.heelLimit}°` : ''}</span><span class="chip">${PORTS.slice(0, G.cfg.pods).map((p) => p.code).join(' → ')}</span>${G.plug.length ? '<span class="chip">점선 = 리퍼 플러그</span>' : ''}</div>`;
+      h += sec('베이 플랜 · 13 갑판', '', grid);
     }
-    v.innerHTML = h;
+    $('vmt').innerHTML = h;
   }
 
-  // ================= drawing =================
+  // ================= drawing: objects =================
   function roof(cx, cy, w, l, b, alpha = 1) {
     const x = cx - w / 2, y = cy - l / 2;
     const [body, rib] = COLORS[b.c];
     ctx.globalAlpha = alpha;
     ctx.fillStyle = body; ctx.fillRect(x, y, w, l);
+    const wr = b.wear;
+    if (wr) {
+      ctx.fillStyle = wr.shade > 0 ? `rgba(255,255,255,${wr.shade})` : `rgba(0,0,0,${-wr.shade})`;
+      ctx.fillRect(x, y, w, l);
+    }
     ctx.fillStyle = rib;
-    for (let yy = y + 5; yy < y + l - 4; yy += 5) ctx.fillRect(x + 3, yy, w - 6, 1.4);
-    ctx.fillStyle = 'rgba(0,0,0,.4)';
+    for (let yy = y + 5; yy < y + l - 4; yy += 4.5) ctx.fillRect(x + 3, yy, w - 6, 1.3);
+    if (wr) {
+      for (const p of wr.rust) { ctx.fillStyle = `rgba(118,62,30,${p.a * alpha})`; ctx.fillRect(x + p.x * w, y + p.y * l, p.w * w, p.h * l); }
+      if (wr.dent != null) { ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(x + 4, y + wr.dent * l, w * 0.55, 2); }
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(x, y, w, 1.2);
+    ctx.fillStyle = 'rgba(30,30,32,.75)';
     const k = Math.max(3, w * 0.11);
     ctx.fillRect(x, y, k, k); ctx.fillRect(x + w - k, y, k, k); ctx.fillRect(x, y + l - k, k, k); ctx.fillRect(x + w - k, y + l - k, k, k);
-    ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, l - 1);
+    ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, l - 1);
     if (b.pod != null) {
       const bh = l * 0.22;
       ctx.fillStyle = PORTS[b.pod].color; ctx.fillRect(x + 2, y + 2, w - 4, bh);
       ctx.fillStyle = '#14161c'; ctx.textAlign = 'center';
-      ctx.font = `600 ${Math.max(6.5, w * 0.22)}px "IBM Plex Mono", ui-monospace, monospace`;
+      ctx.font = `600 ${Math.max(6.5, w * 0.22)}px ${MONO}`;
       ctx.fillText(PORTS[b.pod].code, cx, y + 2 + bh * 0.5);
-      if (G && G.cfg.weights) { ctx.font = `600 ${Math.max(6, w * 0.18)}px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillText(`${b.w}t`, cx, y + 2 + bh * 0.92); }
+      if (G && G.cfg.weights) { ctx.font = `600 ${Math.max(6, w * 0.18)}px ${MONO}`; ctx.fillText(`${b.w}t`, cx, y + 2 + bh * 0.92); }
     }
     if (b.reefer) {
       const rh = l * 0.11;
       ctx.fillStyle = '#e6edf3'; ctx.fillRect(x + 3, y + l - rh - 3, w - 6, rh);
       ctx.fillStyle = '#2a7bd6'; ctx.textAlign = 'center';
-      ctx.font = `600 ${Math.max(6, w * 0.2)}px "IBM Plex Mono", ui-monospace, monospace`;
+      ctx.font = `600 ${Math.max(6, w * 0.2)}px ${MONO}`;
       ctx.fillText('REEFER', cx, y + l - rh * 0.25 - 3);
     }
     // ISO roof marking: number runs along the length
     ctx.save(); ctx.translate(cx, cy + (b.pod != null ? l * 0.08 : 0)); ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = 'rgba(255,255,255,.93)'; ctx.textAlign = 'center';
-    ctx.font = `600 ${Math.max(6, w * 0.17)}px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.textAlign = 'center';
+    ctx.font = `600 ${Math.max(6, w * 0.17)}px ${MONO}`;
     ctx.fillText(b.no, 0, -w * 0.04);
-    ctx.font = `600 ${Math.max(5.5, w * 0.14)}px "IBM Plex Mono", ui-monospace, monospace`;
-    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.font = `600 ${Math.max(5.5, w * 0.14)}px ${MONO}`;
+    ctx.fillStyle = 'rgba(255,255,255,.65)';
     ctx.fillText(b.type, 0, w * 0.24);
     ctx.restore();
     ctx.textAlign = 'left'; ctx.globalAlpha = 1;
   }
 
-  // Higher tiers sit closer to the cab: drawn larger and nudged up-left so lower tiers show at the edge.
+  // Higher tiers sit closer to the camera: drawn larger and nudged up-left so lower tiers show at the edge.
   function tierGeom(cx, cy, i) { const s = 1 + 0.045 * i; return { x: cx - i * 1.5, y: cy - i * 2, w: L.cw * s, l: L.cl * s }; }
+  function geomH(x, h) { const s = 1 + 0.045 * h; return { x: x - h * 1.5, y: L.bayY - h * 2, w: L.cw * s, l: L.cl * s }; }
   function drawStack(cx, cy, st, alpha = 1) {
     if (!st.length) return null;
     const n = st.length;
-    ctx.globalAlpha = 0.3 * alpha; ctx.fillStyle = '#000';
+    ctx.globalAlpha = 0.32 * alpha; ctx.fillStyle = '#000';
     ctx.fillRect(cx - L.cw / 2 + 2 + n * 1.6, cy - L.cl / 2 + 3 + n * 2, L.cw, L.cl);
     ctx.globalAlpha = 1;
     let g;
@@ -1008,14 +1274,14 @@
       if (i < n - 1) {
         ctx.globalAlpha = alpha;
         ctx.fillStyle = COLORS[st[i].c][1]; ctx.fillRect(g.x - g.w / 2, g.y - g.l / 2, g.w, g.l);
-        ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.strokeRect(g.x - g.w / 2 + 0.5, g.y - g.l / 2 + 0.5, g.w - 1, g.l - 1);
+        ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.strokeRect(g.x - g.w / 2 + 0.5, g.y - g.l / 2 + 0.5, g.w - 1, g.l - 1);
         ctx.globalAlpha = 1;
       } else roof(g.x, g.y, g.w, g.l, st[i], alpha);
     }
     if (alpha === 1) {
-      ctx.fillStyle = '#11131a'; ctx.beginPath(); ctx.arc(g.x - g.w / 2 + 1, g.y - g.l / 2 + 1, 7, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '600 9px "IBM Plex Mono", ui-monospace, monospace'; ctx.textAlign = 'center';
-      ctx.fillText(n, g.x - g.w / 2 + 1, g.y - g.l / 2 + 4.2); ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(12,13,15,.85)'; ctx.fillRect(g.x - g.w / 2 - 2, g.y - g.l / 2 - 2, 13, 11);
+      ctx.fillStyle = '#fff'; ctx.font = `600 8.5px ${MONO}`; ctx.textAlign = 'center';
+      ctx.fillText(n, g.x - g.w / 2 + 4.5, g.y - g.l / 2 + 6.5); ctx.textAlign = 'left';
     }
     return g;
   }
@@ -1024,69 +1290,76 @@
     ctx.strokeRect(g.x - g.w / 2 - padding, g.y - g.l / 2 - padding, g.w + padding * 2, g.l + padding * 2);
     ctx.lineWidth = 1;
   }
-  function slotGeom(r) { return { x: L.rowX[r], y: L.bayY, w: L.cw, l: L.cl }; }
+  const slotGeom = (r) => ({ x: L.rowX[r], y: L.bayY, w: L.cw, l: L.cl });
 
   function drawTruck(cx, cy, b, facingDown) {
     const w = L.cw, l = L.cl, dir = facingDown ? 1 : -1;
-    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(cx - w / 2 + 3, cy - l / 2 + 4, w, l + w * 0.9);
+    ctx.fillStyle = 'rgba(0,0,0,.32)'; ctx.fillRect(cx - w / 2 + 3, cy - l / 2 + 4, w, l + w * 0.9);
     ctx.fillStyle = '#25282e'; ctx.fillRect(cx - w * 0.32, cy - l / 2, w * 0.64, l);
-    ctx.fillStyle = '#111'; for (const yy of [-l / 2 + 4, -l / 2 + 12, l / 2 - 14, l / 2 - 6]) { ctx.fillRect(cx - w / 2 + 1, cy + yy, 5, 6); ctx.fillRect(cx + w / 2 - 6, cy + yy, 5, 6); }
+    ctx.fillStyle = '#3a3f45'; ctx.fillRect(cx - w * 0.32, cy - l / 2 + l * 0.33, w * 0.64, 2); ctx.fillRect(cx - w * 0.32, cy - l / 2 + l * 0.66, w * 0.64, 2);
+    ctx.fillStyle = '#0e0f11'; for (const yy of [-l / 2 + 4, -l / 2 + 12, l / 2 - 14, l / 2 - 6]) { ctx.fillRect(cx - w / 2 + 1, cy + yy, 5, 6); ctx.fillRect(cx + w / 2 - 6, cy + yy, 5, 6); }
     const cabY = cy + dir * (l / 2 + 2) + (facingDown ? 0 : -w * 0.78);
-    ctx.fillStyle = '#e9ecef'; ctx.fillRect(cx - w / 2 + 2, cabY, w - 4, w * 0.78);
-    ctx.fillStyle = '#2b3a4a'; ctx.fillRect(cx - w / 2 + 5, cabY + (facingDown ? w * 0.5 : w * 0.06), w - 10, w * 0.2);
+    ctx.fillStyle = '#d9dcdf'; ctx.fillRect(cx - w / 2 + 2, cabY, w - 4, w * 0.78);
+    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(cx - w / 2 + 2, cabY + w * 0.38, w - 4, 1);
+    ctx.fillStyle = '#26323e'; ctx.fillRect(cx - w / 2 + 5, cabY + (facingDown ? w * 0.52 : w * 0.06), w - 10, w * 0.2);
+    ctx.fillStyle = '#0e0f11'; ctx.fillRect(cx - w / 2 - 1, cabY + (facingDown ? w * 0.55 : w * 0.1), 3, 4); ctx.fillRect(cx + w / 2 - 2, cabY + (facingDown ? w * 0.55 : w * 0.1), 3, 4);
     if (b) roof(cx, cy, w, l, b);
   }
 
+  // ================= drawing: scenes =================
   function drawYard() {
-    ctx.fillStyle = '#5f6369'; ctx.fillRect(VX0, 0, VW, LH);
-    // lane
+    ctx.fillStyle = TEX.asphaltP; ctx.fillRect(VX0, 0, VW, LH);
+    for (const s of G.stains) { ctx.fillStyle = 'rgba(16,16,18,.16)'; ctx.beginPath(); ctx.ellipse(s.x, s.y % (LH + 40), s.rx, s.ry, s.r, 0, 7); ctx.fill(); }
+    // truck lane with worn paint
     const lx = L.laneX - L.colW / 2 - 4, lw = L.colW + 8;
-    ctx.fillStyle = '#54585e'; ctx.fillRect(lx, 0, lw, LH);
-    ctx.fillStyle = '#e7c13d'; ctx.fillRect(lx, 0, 2, LH); ctx.fillRect(lx + lw - 2, 0, 2, LH);
-    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.fillRect(lx, 0, lw, LH);
+    ctx.fillStyle = 'rgba(226,186,58,.8)'; ctx.fillRect(lx, 0, 2, LH); ctx.fillRect(lx + lw - 2, 0, 2, LH);
+    ctx.fillStyle = 'rgba(235,235,235,.5)';
     for (let y = 0; y < LH; y += 30) ctx.fillRect(L.laneX - 1, y, 2, 14);
+    // painted block mark on the ground
+    ctx.save(); ctx.translate(L.laneX, L.bayY - L.bayGap); ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = 'rgba(240,240,240,.28)'; ctx.font = `600 16px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText('A03', 0, 6); ctx.restore();
     // slot markings for every bay in view
     for (let k = -3; k <= 3; k++) {
       const y = L.bayY + k * L.bayGap;
       if (y < -L.cl || y > LH + L.cl) continue;
-      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(240,240,240,.3)'; ctx.lineWidth = 1;
       for (let r = 0; r < G.R; r++) ctx.strokeRect(L.rowX[r] - L.cw / 2 - 3, y - L.cl / 2 - 3, L.cw + 6, L.cl + 6);
-      ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '600 8px "IBM Plex Mono", ui-monospace, monospace';
+      ctx.fillStyle = 'rgba(240,240,240,.55)'; ctx.font = `600 8px ${MONO}`;
       ctx.fillText(`BAY ${15 + k * 2}`, L.rowX[0] - L.cw / 2 - 2, y - L.cl / 2 - 7);
     }
     for (const nb of G.neighbors) {
       const y = L.bayY + nb.k * L.bayGap;
-      nb.stacks.forEach((st, r) => drawStack(L.rowX[r], y, st, 0.5));
+      nb.stacks.forEach((st, r) => drawStack(L.rowX[r], y, st, 0.55));
     }
   }
 
   function drawShip() {
-    ctx.fillStyle = '#1d4558'; ctx.fillRect(VX0, 0, VW, LH);
-    ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1;
-    for (let y = 8; y < LH; y += 22) { ctx.beginPath(); ctx.moveTo(VX0, y); ctx.lineTo(VX0 + VW, y + 6); ctx.stroke(); }
+    ctx.fillStyle = TEX.waterP; ctx.fillRect(VX0, 0, VW, LH);
     // quay apron with truck lane
     const qx = L.laneX + L.colW / 2 + 5;
-    ctx.fillStyle = '#9a9c9e'; ctx.fillRect(VX0, 0, qx - VX0, LH);
-    ctx.fillStyle = '#86898c'; ctx.fillRect(L.laneX - L.colW / 2 - 2, 0, L.colW + 4, LH);
-    ctx.fillStyle = '#e7c13d'; ctx.fillRect(L.laneX - L.colW / 2 - 2, 0, 2, LH);
+    ctx.fillStyle = TEX.concreteP; ctx.fillRect(VX0, 0, qx - VX0, LH);
+    ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.fillRect(L.laneX - L.colW / 2 - 2, 0, L.colW + 4, LH);
+    ctx.fillStyle = 'rgba(226,186,58,.8)'; ctx.fillRect(L.laneX - L.colW / 2 - 2, 0, 2, LH);
     ctx.fillStyle = '#2b2d30'; ctx.fillRect(qx - 3, 0, 3, LH);
-    ctx.fillStyle = '#e7c13d'; for (let y = 20; y < LH; y += 70) { ctx.beginPath(); ctx.arc(qx - 8, y, 3, 0, Math.PI * 2); ctx.fill(); }
-    // hull
+    ctx.fillStyle = '#d7b13a'; for (let y = 20; y < LH; y += 70) { ctx.beginPath(); ctx.arc(qx - 8, y, 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#16181b'; for (let y = 45; y < LH; y += 70) ctx.fillRect(qx, y, 4, 16); // fenders
+    // hull and deck
     const hx = L.rowX[0] - L.colW / 2 - 9, hw = L.rowX[G.R - 1] + L.colW / 2 + 9 - hx;
-    ctx.fillStyle = '#2e3138'; ctx.fillRect(hx - 5, 0, hw + 10, LH);
-    ctx.fillStyle = '#6a6f77'; ctx.fillRect(hx, 0, hw, LH);
+    ctx.fillStyle = '#2b2e34'; ctx.fillRect(hx - 5, 0, hw + 10, LH);
+    ctx.fillStyle = '#585d64'; ctx.fillRect(hx, 0, hw, LH);
     for (let k = -3; k <= 3; k++) {
       const y = L.bayY + k * L.bayGap;
       // hatch cover and lashing bridge
-      ctx.fillStyle = '#7d828a'; ctx.fillRect(hx + 4, y - L.cl / 2 - 8, hw - 8, L.cl + 16);
-      ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.strokeRect(hx + 4.5, y - L.cl / 2 - 7.5, hw - 9, L.cl + 15);
-      ctx.fillStyle = '#4c5057'; ctx.fillRect(hx, y + L.bayGap / 2 - 5, hw, 10);
+      ctx.fillStyle = TEX.steelP; ctx.fillRect(hx + 4, y - L.cl / 2 - 8, hw - 8, L.cl + 16);
+      ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.strokeRect(hx + 4.5, y - L.cl / 2 - 7.5, hw - 9, L.cl + 15);
+      ctx.fillStyle = '#41454b'; ctx.fillRect(hx, y + L.bayGap / 2 - 5, hw, 10);
       ctx.fillStyle = '#c9a43a'; ctx.fillRect(hx, y + L.bayGap / 2 - 5, hw, 1.5);
-      ctx.fillStyle = 'rgba(255,255,255,.65)'; ctx.font = '600 8px "IBM Plex Mono", ui-monospace, monospace';
+      ctx.fillStyle = 'rgba(240,240,240,.6)'; ctx.font = `600 8px ${MONO}`;
       ctx.fillText(`BAY ${pad2(13 + k * 2)}`, hx + 6, y - L.cl / 2 - 1);
       if (k === 0) {
         for (let r = 0; r < G.R; r++) {
-          ctx.strokeStyle = G.plug.includes(r) ? '#5fb3ff' : 'rgba(255,255,255,.4)';
+          ctx.strokeStyle = G.plug.includes(r) ? '#5fb3ff' : 'rgba(240,240,240,.38)';
           ctx.setLineDash(G.plug.includes(r) ? [4, 3] : []);
           ctx.strokeRect(L.rowX[r] - L.cw / 2 - 3, y - L.cl / 2 - 3, L.cw + 6, L.cl + 6);
           ctx.setLineDash([]);
@@ -1095,94 +1368,233 @@
     }
     for (const nb of G.neighbors) {
       const y = L.bayY + nb.k * L.bayGap;
-      nb.stacks.forEach((st, r) => drawStack(L.rowX[r], y, st, 0.45));
+      nb.stacks.forEach((st, r) => drawStack(L.rowX[r], y, st, 0.5));
     }
   }
 
   function drawCrane() {
     const yard = G.kind === 'yard';
     const top = L.bayY - L.cl / 2 - 20, bot = L.bayY + L.cl / 2 + 20;
-    const col = yard ? '#efb52e' : '#5f93bf', dark = yard ? '#a87a12' : '#3c6688';
+    const col = yard ? '#d9a530' : '#5b8db6', dark = yard ? '#8f6b16' : '#365f80';
     const x0 = yard ? 0 : VX0, x1 = yard ? LW : VX0 + VW;
     for (const gy of [top, bot]) {
-      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x0 + 4, gy + 4, x1 - x0, 9);
-      ctx.fillStyle = col; ctx.fillRect(x0, gy - 4, x1 - x0, 9);
-      ctx.fillStyle = dark; for (let x = x0; x < x1; x += 12) ctx.fillRect(x, gy - 2, 2, 5);
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(x0 + 5, gy + 5, x1 - x0, 10);
+      ctx.fillStyle = col; ctx.fillRect(x0, gy - 4, x1 - x0, 10);
+      ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(x0, gy - 4, x1 - x0, 1.5);
+      ctx.fillStyle = dark; for (let x = x0; x < x1; x += 12) { ctx.fillRect(x, gy - 2, 1.5, 6); ctx.fillRect(x + 6, gy, 1.5, 4); }
     }
     const legs = yard ? [2, LW - 14] : [2, L.laneX + L.colW / 2 - 6];
     for (const lx of legs) for (const gy of [top, bot]) {
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(lx + 4, gy - 10, 12, 28);
       ctx.fillStyle = dark; ctx.fillRect(lx, gy - 14, 12, 28);
-      ctx.fillStyle = '#16171a'; ctx.fillRect(lx + 1, gy - 18, 10, 5); ctx.fillRect(lx + 1, gy + 13, 10, 5);
+      ctx.fillStyle = '#121315'; ctx.fillRect(lx + 1, gy - 18, 10, 5); ctx.fillRect(lx + 1, gy + 13, 10, 5);
     }
-    ctx.fillStyle = '#fff'; ctx.font = '600 8px "IBM Plex Mono", ui-monospace, monospace';
-    ctx.fillText(yard ? 'RTG-07' : 'STS-03', 18, top + 2.5);
-    // row labels under the lower girder
-    ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '600 10px "IBM Plex Mono", ui-monospace, monospace';
+    // row labels painted under the lower girder
+    ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(240,240,240,.85)'; ctx.font = `600 10px ${MONO}`;
     for (let r = 0; r < G.R; r++) ctx.fillText(yard ? pad2(r + 1) : G.labels[r], L.rowX[r], bot + 20);
-    ctx.fillText('트럭', L.laneX, bot + 20);
+    ctx.fillText('LANE', L.laneX, bot + 20);
     ctx.textAlign = 'left';
-    // trolley + cab
+    // trolley frame
     const tx = crane.x;
     ctx.strokeStyle = dark; ctx.lineWidth = 3;
     ctx.strokeRect(tx - L.cw / 2 - 9, top - 7, L.cw + 18, bot - top + 14);
     ctx.lineWidth = 1;
     ctx.fillStyle = '#2b3448'; ctx.fillRect(tx + L.cw / 2 + 2, top - 10, 13, 17);
-    ctx.fillStyle = '#9fd0ff'; ctx.fillRect(tx + L.cw / 2 + 4, top - 2, 9, 5);
-    // spreader / carried box
-    if (G.manual) drawManualSpreader(tx);
-    else if (crane.carrying) {
-      const s = 1.2;
-      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(tx - L.cw * s / 2 + 12, L.bayY - L.cl * s / 2 + 15, L.cw * s, L.cl * s);
-      roof(tx, L.bayY, L.cw * s, L.cl * s, crane.carrying);
-      ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2;
-      ctx.strokeRect(tx - L.cw * s / 2 - 2, L.bayY - L.cl * s / 2 - 2, L.cw * s + 4, L.cl * s + 4);
-      ctx.lineWidth = 1;
-    } else {
-      ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2;
-      ctx.strokeRect(tx - L.cw / 2 - 1, L.bayY - L.cl / 2 - 1, L.cw + 2, L.cl + 2);
-      ctx.beginPath(); ctx.moveTo(tx - L.cw / 2, L.bayY); ctx.lineTo(tx + L.cw / 2, L.bayY); ctx.stroke();
-      ctx.lineWidth = 1;
-      ctx.fillStyle = '#ffd34d';
-      for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) ctx.fillRect(tx + dx * L.cw / 2 - 3, L.bayY + dy * L.cl / 2 - 3, 6, 6);
+    ctx.fillStyle = '#7fb6e6'; ctx.fillRect(tx + L.cw / 2 + 4, top - 2, 9, 5);
+    if (G.manual) drawManualSpreader();
+    else {
+      const s = crane.carrying ? 1.2 : 1;
+      if (crane.carrying) {
+        ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(tx - L.cw * s / 2 + 12, L.bayY - L.cl * s / 2 + 15, L.cw * s, L.cl * s);
+        roof(tx, L.bayY, L.cw * s, L.cl * s, crane.carrying);
+      }
+      spreaderFrame({ x: tx, y: L.bayY, w: L.cw * s, l: L.cl * s }, '#f2c230', false, !!crane.carrying);
     }
   }
-
-  // Spreader drawn at its hoist height: higher means closer to the cab, so larger and nudged up-left.
-  function geomH(x, h) { const s = 1 + 0.045 * h; return { x: x - h * 1.5, y: L.bayY - h * 2, w: L.cw * s, l: L.cl * s }; }
-  function drawManualSpreader(tx) {
-    const m = G.m, obs = obstacleAt(tx);
-    const bottom = m.hb - (crane.carrying ? 1 : 0), drop = Math.max(0, bottom - obs);
-    const gs = geomH(tx, obs - 1);
-    ctx.fillStyle = `rgba(0,0,0,${0.16 + 0.2 / (1 + drop)})`;
-    ctx.fillRect(gs.x - gs.w / 2 + drop * 5, gs.y - gs.l / 2 + drop * 6, gs.w, gs.l);
-    const g = geomH(tx, m.hb - 1);
-    if (crane.carrying) roof(g.x, g.y, g.w, g.l, crane.carrying);
-    const col = m.landed ? (m.aligned != null ? '#6fdc9c' : '#ff6b5e') : '#ffd34d';
+  function spreaderFrame(g, col, landed, locked) {
     ctx.strokeStyle = col; ctx.lineWidth = 2.5;
     ctx.strokeRect(g.x - g.w / 2 - 1, g.y - g.l / 2 - 1, g.w + 2, g.l + 2);
     ctx.beginPath(); ctx.moveTo(g.x - g.w / 2, g.y); ctx.lineTo(g.x + g.w / 2, g.y); ctx.stroke();
     ctx.lineWidth = 1; ctx.fillStyle = col;
     for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) ctx.fillRect(g.x + dx * g.w / 2 - 3.5, g.y + dy * g.l / 2 - 3.5, 7, 7);
+    // spreader indicator lights (landed / locked / unlocked), as on a real spreader
+    const ly = g.y - g.l / 2 + 7;
+    const light = (x, c, on) => { ctx.fillStyle = on ? c : 'rgba(40,40,40,.9)'; ctx.beginPath(); ctx.arc(x, ly, 2.4, 0, 7); ctx.fill(); };
+    light(g.x - 6, '#ffffff', landed); light(g.x, '#3fdc8f', locked); light(g.x + 6, '#ffb02e', !locked);
+  }
+
+  function drawManualSpreader() {
+    const m = G.m, sx = spreaderX(), obs = obstacleAt(sx);
+    const bottom = m.hb - (crane.carrying ? 1 : 0), drop = Math.max(0, bottom - obs);
+    // ropes from trolley to spreader show the swing
+    const g = geomH(sx, m.hb - 1);
+    ctx.strokeStyle = 'rgba(30,30,30,.7)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const dx of [-1, 1]) for (const dy of [-1, 1]) { ctx.moveTo(crane.x + dx * L.cw * 0.3, L.bayY + dy * L.cl * 0.3); ctx.lineTo(g.x + dx * g.w * 0.3, g.y + dy * g.l * 0.3); }
+    ctx.stroke();
+    const gs = geomH(sx, obs - 1);
+    ctx.fillStyle = `rgba(0,0,0,${0.18 + 0.2 / (1 + drop)})`;
+    ctx.fillRect(gs.x - gs.w / 2 + drop * 5, gs.y - gs.l / 2 + drop * 6, gs.w, gs.l);
+    if (crane.carrying) roof(g.x, g.y, g.w, g.l, crane.carrying);
+    const col = m.landed ? (m.aligned != null ? '#3fdc8f' : '#ff5a5f') : '#f2c230';
+    spreaderFrame(g, col, m.landed, !!crane.carrying);
     // alignment guide: ticks over the column the spreader is lined up with
     if (m.aligned != null && !m.landed) {
       const cx = colX(m.aligned);
-      ctx.fillStyle = 'rgba(111,220,156,.9)';
+      ctx.fillStyle = 'rgba(63,220,143,.9)';
       ctx.fillRect(cx - 1, L.bayY - L.cl / 2 - 14, 2, 8); ctx.fillRect(cx - 1, L.bayY + L.cl / 2 + 6, 2, 8);
     }
-    // hoist height gauge
-    const gx = VX0 + VW - 26, gy = 10, gh = Math.min(120, LH * 0.3), unit = gh / HMAX();
-    ctx.fillStyle = 'rgba(12,16,22,.75)'; ctx.fillRect(gx - 4, gy - 4, 26, gh + 20);
-    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(gx, gy + gh - obs * unit, 8, obs * unit);
-    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = '600 7px "IBM Plex Mono", ui-monospace, monospace';
-    for (let t = 0; t <= G.T; t++) { ctx.fillRect(gx, gy + gh - t * unit, 10, 1); if (t) ctx.fillText(t, gx + 12, gy + gh - t * unit + 2.5); }
-    ctx.fillStyle = col; ctx.fillRect(gx - 2, gy + gh - bottom * unit - 1.5, 14, 3);
-    ctx.fillStyle = '#fff'; ctx.fillText('HOIST', gx - 2, gy + gh + 11);
   }
 
-  function draw() {
+  function drawFx(dt) {
+    for (const f of G.fx) {
+      f.t += dt;
+      const g = geomH(f.x, f.h - 1);
+      if (f.type === 'twl') {
+        const k = Math.min(1, f.t / 0.3), a = Math.max(0, 1 - Math.max(0, f.t - 0.4) / 0.4);
+        const ang = (f.lock ? k : 1 - k) * Math.PI / 2;
+        ctx.strokeStyle = f.lock ? `rgba(63,220,143,${a})` : `rgba(255,176,46,${a})`; ctx.lineWidth = 2.5;
+        for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          const cx = g.x + dx * (g.w / 2 - 3), cy = g.y + dy * (g.l / 2 - 3);
+          ctx.beginPath(); ctx.moveTo(cx - Math.cos(ang) * 4, cy - Math.sin(ang) * 4); ctx.lineTo(cx + Math.cos(ang) * 4, cy + Math.sin(ang) * 4); ctx.stroke();
+        }
+        ctx.lineWidth = 1;
+        ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.font = `600 8px ${MONO}`; ctx.textAlign = 'center';
+        ctx.fillText(f.lock ? 'TWL LOCKED' : 'TWL UNLOCKED', g.x, g.y + g.l / 2 + 12); ctx.textAlign = 'left';
+      } else {
+        const a = Math.max(0, 1 - f.t / 0.8), r = 3 + f.t * 26;
+        ctx.fillStyle = `rgba(196,186,166,${0.35 * a})`;
+        for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [-1, 0], [1, 0]]) {
+          ctx.beginPath(); ctx.arc(g.x + dx * (g.w / 2 + f.t * 14), g.y + dy * (g.l / 2 + f.t * 10), r, 0, 7); ctx.fill();
+        }
+      }
+    }
+    G.fx = G.fx.filter((f) => f.t < 0.9);
+  }
+
+  // ================= drawing: weather and the CCTV look =================
+  function lightPoles() {
+    const left = Math.min(L.laneX, L.rowX[0]) - L.colW / 2 - 10, right = Math.max(L.laneX, L.rowX[G.R - 1]) + L.colW / 2 + 10;
+    return [-1, 0, 1].flatMap((k) => [{ x: left, y: L.bayY + k * L.bayGap * 1.5 }, { x: right, y: L.bayY + (k + 0.5) * L.bayGap * 1.5 }]);
+  }
+  function drawNight() {
+    ctx.save();
+    ctx.globalCompositeOperation = 'saturation'; ctx.fillStyle = '#808080'; ctx.fillRect(VX0, 0, VW, LH); // IR camera: monochrome
+    ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = '#4f5357'; ctx.fillRect(VX0, 0, VW, LH);
+    ctx.globalCompositeOperation = 'lighter';
+    const pools = lightPoles().map((p) => ({ ...p, r: 160, a: 0.24 }));
+    pools.push({ x: spreaderX(), y: L.bayY, r: L.cl * 0.95, a: 0.3 }); // trolley floodlight
+    for (const p of pools) {
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+      g.addColorStop(0, `rgba(235,235,225,${p.a})`); g.addColorStop(1, 'rgba(235,235,225,0)');
+      ctx.fillStyle = g; ctx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+    }
+    ctx.restore();
+  }
+  function drawRain(dt) {
+    ctx.fillStyle = 'rgba(30,40,50,.2)'; ctx.fillRect(VX0, 0, VW, LH);
+    ctx.strokeStyle = 'rgba(210,220,230,.32)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const r of G.rain) {
+      r.y += dt * r.s * 1.6; r.x += dt * r.s * 0.25;
+      if (r.y > 1) { r.y -= 1; r.x = Math.random(); }
+      const x = VX0 + (r.x % 1) * VW, y = r.y * LH;
+      ctx.moveTo(x, y); ctx.lineTo(x + r.l * 0.25, y + r.l);
+    }
+    ctx.stroke();
+  }
+  function drawLensDrops() {
+    for (const d of G.drops) {
+      const x = VX0 + d.x * VW, y = d.y * LH;
+      const g = ctx.createRadialGradient(x - d.r * 0.3, y - d.r * 0.3, 0, x, y, d.r);
+      g.addColorStop(0, 'rgba(255,255,255,.22)'); g.addColorStop(0.7, 'rgba(200,210,220,.08)'); g.addColorStop(1, 'rgba(0,0,0,.12)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, d.r, 0, 7); ctx.fill();
+    }
+  }
+  // Spreader camera: a zoomed crop of the main feed around the spreader, for fine alignment.
+  // Sized to fit the strip above the working bay so it never covers the containers being handled.
+  const camRoom = () => L.bayY - L.cl / 2 - 30 - 44;
+  function drawSpreaderCam() {
+    const m = G.m, sx = spreaderX(), g = geomH(sx, m.hb - 1);
+    const ph = Math.min(78, camRoom()), pw = Math.min(ph * 2.1, VW * 0.42), px = VX0 + 8, py = 36;
+    if (ph < 34) return;
+    const rw = L.cw * 2.6, rh = rw * (ph / pw), k = dpr * scale;
+    let srcX = (g.x - rw / 2 + ox) * k, srcY = (g.y - rh / 2) * k;
+    const srcW = rw * k, srcH = rh * k;
+    srcX = Math.max(0, Math.min(cvs.width - srcW, srcX)); srcY = Math.max(0, Math.min(cvs.height - srcH, srcY));
+    ctx.fillStyle = '#000'; ctx.fillRect(px - 1, py - 1, pw + 2, ph + 2);
+    try { ctx.drawImage(cvs, srcX, srcY, srcW, srcH, px, py, pw, ph); } catch (e) {}
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.strokeRect(px - 0.5, py - 0.5, pw + 1, ph + 1);
+    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.beginPath();
+    ctx.moveTo(px + pw / 2, py + ph / 2 - 8); ctx.lineTo(px + pw / 2, py + ph / 2 + 8);
+    ctx.moveTo(px + pw / 2 - 8, py + ph / 2); ctx.lineTo(px + pw / 2 + 8, py + ph / 2); ctx.stroke();
+    osd('CAM 03 · SPREADER', px, py - 4, 'left', 7);
+    let txt = 'ALIGN --', c = '#f2c230';
+    if (m.aligned != null) {
+      const cm = Math.round((sx - colX(m.aligned)) / L.colW * 285);
+      txt = `ALIGN ${cm >= 0 ? '+' : ''}${cm}cm`; c = '#3fdc8f';
+    }
+    osd(txt, px, py + ph + 10, 'left', 7, c);
+    if (Math.abs(m.sw) > 1.5) osd(`SWAY ${(m.sw / L.colW * 2.85).toFixed(2)}m`, px + pw, py + ph + 10, 'right', 7, '#ff8a5c');
+  }
+  function osd(text, x, y, align = 'left', size = 8, color = 'rgba(255,255,255,.92)') {
+    ctx.font = `600 ${size}px ${MONO}`; ctx.textAlign = align;
+    ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(text, x, y);
+    ctx.fillStyle = color; ctx.fillText(text, x, y); ctx.textAlign = 'left'; ctx.lineWidth = 1;
+  }
+  function drawOverlay() {
+    const yard = G.kind === 'yard', x0 = VX0, x1 = VX0 + VW;
+    // vignette
+    const cx = x0 + VW / 2, cy = LH / 2;
+    const vg = ctx.createRadialGradient(cx, cy, Math.min(VW, LH) * 0.35, cx, cy, Math.max(VW, LH) * 0.78);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.5)');
+    ctx.fillStyle = vg; ctx.fillRect(x0, 0, VW, LH);
+    // scanlines and sensor grain in device pixels
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = TEX.scanP; ctx.fillRect(0, 0, cvs.width, cvs.height);
+    ctx.globalAlpha = G.env === 'night' ? 0.13 : 0.06; ctx.globalCompositeOperation = 'overlay';
+    ctx.translate(-rand(160), -rand(160)); ctx.fillStyle = TEX.grainP; ctx.fillRect(0, 0, cvs.width + 160, cvs.height + 160);
+    ctx.restore(); worldTransform();
+    // corner brackets
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (const [x, y, sx, sy] of [[x0 + 5, 5, 1, 1], [x1 - 5, 5, -1, 1], [x0 + 5, LH - 5, 1, -1], [x1 - 5, LH - 5, -1, -1]]) {
+      ctx.moveTo(x + sx * 14, y); ctx.lineTo(x, y); ctx.lineTo(x, y + sy * 14);
+    }
+    ctx.stroke(); ctx.lineWidth = 1;
+    // on-screen display: camera, telemetry, time
+    const rec = Math.floor(now() / 600) % 2 === 0;
+    if (rec) { ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(x0 + 14, 15.5, 3, 0, 7); ctx.fill(); }
+    osd(`CAM 01 · ${yard ? 'RTG-07 BOOM' : 'STS-03 BOOM'} · ${G.env === 'night' ? 'IR' : 'DAY'}`, x0 + 21, 18);
+    const d = new Date();
+    osd(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${clock()}`, x1 - 10, 18, 'right');
+    if (G.manual) {
+      const m = G.m, xs = columns().map((c) => c.x), left = Math.min(...xs);
+      const load = crane.carrying ? `${crane.carrying.w.toFixed(1)}t` : '0.0t';
+      osd(`TRL ${((spreaderX() - left) / L.colW * 2.85).toFixed(1)}m  HST ${((m.hb - (crane.carrying ? 1 : 0)) * 2.59).toFixed(1)}m  LOAD ${load}`, x1 - 10, 29, 'right', 7);
+      drawHoistGauge(x1 - 24, 38);
+      drawSpreaderCam();
+    }
+    // alarm banner flashes after a penalty
+    if (now() - G.alarmT < 1600 && Math.floor(now() / 250) % 2 === 0) {
+      ctx.strokeStyle = 'rgba(229,72,77,.9)'; ctx.lineWidth = 4; ctx.strokeRect(x0 + 2, 2, VW - 4, LH - 4); ctx.lineWidth = 1;
+    }
+  }
+  function drawHoistGauge(gx, gy) {
+    const m = G.m, obs = obstacleAt(spreaderX()), gh = Math.max(40, Math.min(110, camRoom() + 26)), unit = gh / HMAX();
+    const bottom = m.hb - (crane.carrying ? 1 : 0);
+    ctx.fillStyle = 'rgba(14,16,18,.82)'; ctx.fillRect(gx - 4, gy - 4, 24, gh + 18);
+    ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(gx, gy + gh - obs * unit, 8, obs * unit);
+    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = `600 6.5px ${MONO}`;
+    for (let t = 0; t <= G.T; t++) { ctx.fillRect(gx, gy + gh - t * unit, 10, 1); if (t) ctx.fillText(t, gx + 12, gy + gh - t * unit + 2.5); }
+    ctx.fillStyle = m.landed ? (m.aligned != null ? '#3fdc8f' : '#ff5a5f') : '#f2c230';
+    ctx.fillRect(gx - 2, gy + gh - bottom * unit - 1.5, 14, 3);
+    ctx.fillStyle = '#fff'; ctx.fillText('HOIST', gx - 2, gy + gh + 10);
+  }
+
+  function draw(dt) {
     if (!G || !L) return;
     if (G.kind === 'yard') drawYard(); else drawShip();
-    const t = now() / 1000, pulse = 0.55 + 0.45 * Math.sin(t * 5);
+    const pulse = 0.55 + 0.45 * Math.sin(now() / 200);
 
     // truck in the lane (drawn under the crane)
     if (truck.state !== 'idle' || truck.box || G.kind === 'yard') {
@@ -1192,32 +1604,37 @@
     const tops = G.stacks.map((st, r) => drawStack(L.rowX[r], L.bayY, st));
     if (G.kind === 'yard' && !G.done) {
       const tgt = curTarget(), p = tgt && findBox(tgt);
-      if (p && G.cfg.hintTarget) outline(tops[p.r], `rgba(255,181,71,${pulse})`, 3, 4);
+      if (p && G.cfg.hintTarget) outline(tops[p.r], `rgba(240,169,44,${pulse})`, 3, 4);
       if (G.cfg.hintPlace && crane.carrying && crane.carrying !== tgt) {
         G.stacks.forEach((st, r) => {
           if (r === G.src || st.length >= G.T || st.includes(tgt) || st.some(isFuture)) return;
-          outline(tops[r] || slotGeom(r), 'rgba(111,220,156,.9)', 2, 5);
+          outline(tops[r] || slotGeom(r), 'rgba(63,220,143,.85)', 2, 5);
         });
       }
-      if (G.cfg.hintTarget && crane.carrying === tgt) outline({ x: L.laneX, y: L.bayY, w: L.cw, l: L.cl }, `rgba(111,220,156,${pulse})`, 3, 6);
+      if (G.cfg.hintTarget && crane.carrying === tgt) outline({ x: L.laneX, y: L.bayY, w: L.cw, l: L.cl }, `rgba(63,220,143,${pulse})`, 3, 6);
     }
     if (G.kind === 'ship' && !G.done && G.diff === 'easy') {
       // beginner hint: rows where the next box causes no overstow
       const b = crane.carrying || G.queue[0];
-      if (b) G.stacks.forEach((st, r) => { if (st.length < G.T && !st.some((x) => x.pod < b.pod)) outline(tops[r] || slotGeom(r), 'rgba(111,220,156,.75)', 2, 5); });
+      if (b) G.stacks.forEach((st, r) => { if (st.length < G.T && !st.some((x) => x.pod < b.pod)) outline(tops[r] || slotGeom(r), 'rgba(63,220,143,.7)', 2, 5); });
     }
 
     drawCrane();
+    drawFx(dt);
+    if (G.env === 'rain') drawRain(dt);
+    if (G.env === 'night') drawNight();
 
-    ctx.textAlign = 'center'; ctx.font = '16px "Black Han Sans", "Apple SD Gothic Neo", sans-serif';
+    ctx.textAlign = 'center'; ctx.font = `600 12px ${MONO}`;
     for (const f of G.floats) {
       ctx.globalAlpha = Math.min(1, f.life * 1.6);
-      ctx.fillStyle = f.kind === 'bad' ? '#ff6b5e' : '#6fdc9c';
-      ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 3;
-      const y = f.y - (1 - f.life) * 26;
-      ctx.strokeText(f.text, f.x, y); ctx.fillText(f.text, f.x, y);
+      const y = f.y - (1 - f.life) * 26, w = ctx.measureText(f.text).width + 10;
+      ctx.fillStyle = f.kind === 'bad' ? 'rgba(229,72,77,.92)' : 'rgba(46,151,103,.92)';
+      ctx.fillRect(f.x - w / 2, y - 11, w, 15);
+      ctx.fillStyle = '#fff'; ctx.fillText(f.text, f.x, y);
     }
-    ctx.globalAlpha = 1; ctx.textAlign = 'left'; ctx.lineWidth = 1;
+    ctx.globalAlpha = 1; ctx.textAlign = 'left';
+    if (G.env === 'rain') drawLensDrops();
+    drawOverlay();
   }
 
   // ================= loop =================
@@ -1239,21 +1656,23 @@
       if (Math.abs(d) > sp) truck.off += Math.sign(d) * sp;
       else { truck.off = goal; truck.state = 'idle'; const cb = truck.cb; truck.cb = null; cb && cb(); }
     }
-    if (G.manual && $('home').hidden && $('result').hidden) manualUpdate(dt);
+    const playing = $('home').hidden && $('result').hidden;
+    if (G.manual && playing) manualUpdate(dt); else motors(0, 0);
     for (const f of G.floats) f.life -= dt * 0.8;
     G.floats = G.floats.filter((f) => f.life > 0);
-    // HUD clock
+    // title bar: clock and alarm lamp
     if (!G.done) {
       const s = G.kind === 'yard' ? (now() - G.truckT0) / 1000 : (now() - G.t0) / 1000;
       const txt = fmtTime(s);
       if ($('hud-time').textContent !== txt) $('hud-time').textContent = txt;
-      $('hud-time-wrap').classList.toggle('late', G.kind === 'yard' && !!waitLimit() && s > waitLimit());
+      setCls($('hud-time-wrap'), G.kind === 'yard' && !!waitLimit() && s > waitLimit() ? 'kpi late' : 'kpi');
     }
+    setCls($('hud-lamp'), now() - G.alarmT < 1600 ? 'lamp alarm' : 'lamp on');
   }
   let last = now();
   function frame(t) {
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
-    update(dt); draw();
+    update(dt); draw(dt);
     requestAnimationFrame(frame);
   }
 
@@ -1317,22 +1736,30 @@
     for (const b of document.querySelectorAll('.mode')) b.setAttribute('aria-pressed', String(b.dataset.game === sel.game));
     for (const b of document.querySelectorAll('[data-diff]')) b.setAttribute('aria-pressed', String(b.dataset.diff === sel.diff));
     for (const b of document.querySelectorAll('[data-ctrl]')) b.setAttribute('aria-pressed', String(b.dataset.ctrl === sel.ctrl));
-    $('ctrl-desc').textContent = CTRL_DESC[sel.ctrl];
+    for (const b of document.querySelectorAll('[data-env]')) b.setAttribute('aria-pressed', String(b.dataset.env === sel.env));
     $('diff-desc').textContent = (sel.game === 'yard' ? YARD : SHIP)[sel.diff].desc;
+    $('ctrl-desc').textContent = CTRL_DESC[sel.ctrl];
+    $('env-desc').textContent = ENV_DESC[sel.env];
     const best = store.get(bestKey(sel.game, sel.diff));
-    $('home-best').innerHTML = best ? `이 작업·난이도 최고 점수 <b>${best}점</b>` : '아직 기록이 없습니다.';
+    $('home-best').innerHTML = best ? `BEST · ${sel.game === 'yard' ? '야드' : '선적'} ${DIFF_NAME[sel.diff]} <b>${best}점</b>` : 'BEST · 아직 기록이 없습니다.';
+    renderSound();
   }
+  const bindSel = (attr, key, storeKey) => {
+    for (const b of document.querySelectorAll(`[data-${attr}]`)) b.addEventListener('click', () => { sel[key] = b.dataset[attr]; store.set(storeKey, sel[key]); renderHome(); });
+  };
   for (const b of document.querySelectorAll('.mode')) b.addEventListener('click', () => { sel.game = b.dataset.game; store.set('edu-game', sel.game); renderHome(); });
-  for (const b of document.querySelectorAll('[data-diff]')) b.addEventListener('click', () => { sel.diff = b.dataset.diff; store.set('edu-diff', sel.diff); renderHome(); });
-  for (const b of document.querySelectorAll('[data-ctrl]')) b.addEventListener('click', () => { sel.ctrl = b.dataset.ctrl; store.set('edu-ctrl', sel.ctrl); renderHome(); });
+  bindSel('diff', 'diff', 'edu-diff');
+  bindSel('ctrl', 'ctrl', 'edu-ctrl');
+  bindSel('env', 'env', 'edu-env');
   $('go').addEventListener('click', startGame);
   $('again').addEventListener('click', startGame);
   const goHome = () => { $('result').hidden = true; $('home').hidden = false; renderHome(); };
   $('r-home').addEventListener('click', goHome);
   $('back').addEventListener('click', goHome);
 
+  initTextures();
   renderHome();
-  // Draw a live yard behind the home screen so the first frame is never empty.
+  // Run a live yard behind the home screen so the first frame is never empty.
   startGame(); $('home').hidden = false;
   requestAnimationFrame(frame);
 })();
