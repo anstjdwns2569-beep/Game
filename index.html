@@ -17,6 +17,7 @@
     --ink: #eaf0f7;
     --ink-dim: #9fb0c6;
     --sodium: #ffb547;
+    --brand: #cc231c;
     --panel: rgba(9, 16, 29, 0.86);
     --line: rgba(159, 176, 198, 0.22);
     --display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
@@ -88,6 +89,23 @@
   }
   .cta:active { transform: translateY(2px); box-shadow: 0 1px 0 #b5741a; }
   .hint { text-align: center; font-size: 12px !important; }
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .mode {
+    display: grid; gap: 3px; justify-items: start; text-align: left;
+    font: 400 12px var(--body); color: var(--ink-dim); line-height: 1.35;
+    background: transparent; border: 1px solid var(--line); border-radius: 4px;
+    padding: 10px 10px 9px; cursor: pointer;
+  }
+  .mode b { font: 400 19px var(--display); color: var(--ink); }
+  .mode[aria-pressed="true"] { border-color: var(--brand); background: rgba(204, 35, 28, 0.18); }
+  .mode[aria-pressed="true"] b { color: #fff; }
+  .mode:focus-visible, .ghost:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+  .mode-desc { min-height: 2.9em; }
+  .ghost {
+    font: 600 14px var(--body); color: var(--ink); background: transparent;
+    border: 1px solid var(--line); border-radius: 4px; padding: 11px; cursor: pointer;
+  }
+  .fineprint { font-size: 11px !important; color: rgba(159,176,198,.7) !important; }
   @media (prefers-reduced-motion: no-preference) {
     .overlay:not([hidden]) .card { animation: rise .35s ease-out; }
   }
@@ -101,36 +119,44 @@
   <div class="hud">
     <div class="score" aria-live="polite"><span id="score">0</span><small>단</small></div>
     <div class="meta">
-      <div class="best">최고 기록 <b id="best">0</b>단</div>
+      <div class="best"><span id="hud-mode">중수</span> 최고 <b id="best">0</b>단</div>
       <button class="chip" id="mute" type="button">소리 켜짐</button>
     </div>
   </div>
 
   <div class="overlay" id="start">
     <div class="card">
-      <div class="eyebrow">Night shift · Berth 3</div>
+      <div class="eyebrow">TGIU · Night shift · Busan</div>
       <h1>컨테이너 쌓기</h1>
-      <p>갠트리 크레인이 컨테이너를 좌우로 옮기고 있어요. 아래 컨테이너 위에 정확히 내려놓아 최대한 높이 쌓아 보세요.</p>
+      <p>갠트리 크레인이 TGIU 컨테이너를 좌우로 옮기고 있어요. 아래 컨테이너 위에 정확히 내려놓아 최대한 높이 쌓아 보세요.</p>
       <ul class="rules">
         <li><span>TAP</span>화면을 탭하면 컨테이너를 내립니다.</li>
         <li><span>CUT</span>어긋난 부분은 잘려서 바다로 떨어져요.</li>
-        <li><span>×3</span>3번 연속 딱 맞추면 폭이 다시 넓어집니다.</li>
+        <li><span>COMBO</span>연속으로 딱 맞추면 폭이 다시 넓어집니다.</li>
       </ul>
+      <div class="modes" role="group" aria-label="난이도">
+        <button class="mode" type="button" data-mode="easy"><b>초보</b>천천히</button>
+        <button class="mode" type="button" data-mode="normal"><b>중수</b>보통 속도</button>
+        <button class="mode" type="button" data-mode="hard"><b>고수</b>빠르고 불규칙</button>
+      </div>
+      <p class="mode-desc" id="mode-desc"></p>
       <button class="cta" id="go" type="button">작업 시작</button>
+      <p class="fineprint">태웅로직스 직원이 만든 비공식 사내 게임입니다.</p>
     </div>
   </div>
 
   <div class="overlay" id="over" hidden>
     <div class="card">
-      <div class="eyebrow">Stack collapsed</div>
+      <div class="eyebrow" id="r-mode">Stack collapsed</div>
       <h2>적재 실패!</h2>
       <div class="stats">
         <div><b id="r-score">0</b><span>이번 기록 (단)</span></div>
-        <div><b id="r-best">0</b><span>최고 기록 (단)</span></div>
+        <div><b id="r-best">0</b><span id="r-best-label">최고 기록 (단)</span></div>
         <div><b id="r-perfect">0</b><span>정확 적재</span></div>
       </div>
       <div class="rank">오늘의 등급: <b id="r-rank">수습 크레인 기사</b></div>
       <button class="cta" id="again" type="button">다시 하기</button>
+      <button class="ghost" id="change" type="button">난이도 바꾸기</button>
       <p class="hint">스페이스바 또는 화면 탭으로도 조작할 수 있어요.</p>
     </div>
   </div>
@@ -139,11 +165,19 @@
 <script>
 (() => {
   // ---- World constants (logical units; the canvas is scaled to fit 360 units wide) ----
-  const LW = 360, BH = 30, GROUND_PAD = 120, BASE_W = 200, PERFECT_PX = 4;
-  const COLORS = [
-    ['#b5452f', '#93361f'], ['#2f68a8', '#24528a'], ['#2e8a5e', '#226b48'],
-    ['#d2902a', '#ab721c'], ['#6d7c8c', '#566370'], ['#1f8a8a', '#176c6c'],
-  ];
+  const LW = 360, BH = 30, GROUND_PAD = 120;
+  // Difficulty: crane speed (start / per tier / cap), how close counts as "정확",
+  // perfect drops needed to widen, how much it widens, base width, and speed wobble.
+  const MODES = {
+    easy:   { name: '초보', speed: 85,  ramp: 4,  cap: 210, tol: 8,   combo: 2, grow: 14, base: 220, wobble: 0,
+              desc: '크레인이 천천히 움직이고, 판정이 넉넉해요. 2번 연속 정확하면 폭이 넓어집니다.' },
+    normal: { name: '중수', speed: 115, ramp: 7,  cap: 320, tol: 4,   combo: 3, grow: 10, base: 200, wobble: 0,
+              desc: '단수가 올라갈수록 빨라져요. 3번 연속 정확하면 폭이 넓어집니다.' },
+    hard:   { name: '고수', speed: 150, ramp: 10, cap: 430, tol: 2.5, combo: 4, grow: 6,  base: 170, wobble: 0.45,
+              desc: '크레인 속도가 계속 출렁이고 판정이 엄격해요. 시작 폭도 좁습니다.' },
+  };
+  // TGIU livery: brand red, a deeper red and navy so neighbouring tiers stay distinguishable.
+  const COLORS = [['#cc231c', '#a51b15'], ['#a91f1a', '#861612'], ['#252b41', '#1b2032']];
   const RANKS = [[0, '수습 크레인 기사'], [8, '숙련 크레인 기사'], [18, '베테랑 갠트리 기사'], [30, '터미널의 전설']];
 
   const cvs = document.getElementById('c');
@@ -153,16 +187,23 @@
 
   let scale = 1, LH = 640;
   let state = 'ready', stack = [], cur = null, debris = [], pops = [], flashes = [];
-  let cam = 0, score = 0, combo = 0, perfects = 0, shake = 0, best = 0, muted = false, overAt = 0;
+  let cam = 0, score = 0, combo = 0, perfects = 0, shake = 0, muted = false, overAt = 0, clock = 0;
+  let mode = 'normal', bests = { easy: 0, normal: 0, hard: 0 };
+  const M = () => MODES[mode];
   const stars = Array.from({ length: 70 }, () => ({ x: Math.random() * LW, y: Math.random(), r: Math.random() * 1.2 + 0.3 }));
 
-  try { best = +localStorage.getItem('stack-best') || 0; muted = localStorage.getItem('stack-muted') === '1'; } catch (e) {}
+  try {
+    for (const k in bests) bests[k] = +localStorage.getItem('stack-best-' + k) || 0;
+    bests.normal = Math.max(bests.normal, +localStorage.getItem('stack-best') || 0);
+    if (MODES[localStorage.getItem('stack-mode')]) mode = localStorage.getItem('stack-mode');
+    muted = localStorage.getItem('stack-muted') === '1';
+  } catch (e) {}
 
   // ---- ISO 6346 container number with a real check digit ----
   const LETTER = {};
   (() => { let v = 10; for (const ch of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') { if (v % 11 === 0) v++; LETTER[ch] = v++; } })();
   function containerNo() {
-    const owner = 'PLYU', serial = String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
+    const owner = 'TGIU', serial = String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
     const code = owner + serial;
     let sum = 0;
     for (let i = 0; i < 10; i++) sum += (LETTER[code[i]] ?? +code[i]) * 2 ** i;
@@ -198,9 +239,9 @@
 
   // ---- Game flow ----
   function reset() {
-    stack = [{ x: (LW - BASE_W) / 2, w: BASE_W, base: true }];
+    stack = [{ x: (LW - M().base) / 2, w: M().base, base: true }];
     debris = []; pops = []; flashes = [];
-    score = 0; combo = 0; perfects = 0; cam = 0;
+    score = 0; combo = 0; perfects = 0; cam = 0; clock = 0;
     newCur();
     updateHud();
   }
@@ -211,7 +252,7 @@
     do { c = Math.floor(Math.random() * COLORS.length); } while (top.c === c);
     cur = {
       w: top.w, x: fromLeft ? -top.w * 0.5 : LW - top.w * 0.5, dir: fromLeft ? 1 : -1,
-      speed: Math.min(110 + score * 7, 320), c, no: containerNo(), type: top.w > 150 ? '45G1' : '22G1',
+      speed: Math.min(M().speed + score * M().ramp, M().cap), c, no: containerNo(), type: top.w > 150 ? '45G1' : '22G1',
     };
   }
   function start() {
@@ -221,10 +262,10 @@
   function drop() {
     const top = stack[stack.length - 1];
     const yW = stack.length * BH;
-    if (Math.abs(cur.x - top.x) <= PERFECT_PX) {
+    if (Math.abs(cur.x - top.x) <= M().tol) {
       combo++; perfects++;
       let { x, w } = top;
-      if (combo >= 3 && w < BASE_W) { const g = Math.min(10, BASE_W - w); w += g; x -= g / 2; }
+      if (combo >= M().combo && w < M().base) { const g = Math.min(M().grow, M().base - w); w += g; x -= g / 2; }
       stack.push({ x, w, c: cur.c, no: cur.no, type: cur.type });
       flashes.push({ x, w, yW, life: 1 });
       pops.push({ text: combo > 1 ? `정확! ×${combo}` : '정확!', x: x + w / 2, yW: yW + BH, life: 1 });
@@ -251,16 +292,18 @@
   function gameOver() {
     state = 'over'; overAt = performance.now();
     beep(70, 0.6, 'sawtooth', 0.18); buzz([30, 40, 60]);
-    if (score > best) { best = score; try { localStorage.setItem('stack-best', best); } catch (e) {} }
+    if (score > bests[mode]) { bests[mode] = score; try { localStorage.setItem('stack-best-' + mode, score); } catch (e) {} }
     updateHud();
     let rank = RANKS[0][1];
     for (const [min, name] of RANKS) if (score >= min) rank = name;
-    $('r-score').textContent = score; $('r-best').textContent = best;
+    $('r-score').textContent = score; $('r-best').textContent = bests[mode];
+    $('r-best-label').textContent = `${M().name} 최고 (단)`;
+    $('r-mode').textContent = `Stack collapsed · ${M().name} 모드`;
     $('r-perfect').textContent = perfects; $('r-rank').textContent = rank;
     setTimeout(() => { if (state === 'over') $('over').hidden = false; }, 700);
   }
   function updateHud() {
-    $('score').textContent = score; $('best').textContent = best;
+    $('score').textContent = score; $('best').textContent = bests[mode]; $('hud-mode').textContent = M().name;
     $('mute').textContent = muted ? '소리 꺼짐' : '소리 켜짐';
   }
   function act() {
@@ -272,6 +315,16 @@
   // ---- Input ----
   cvs.addEventListener('pointerdown', (e) => { e.preventDefault(); act(); });
   for (const id of ['start', 'over']) $(id).addEventListener('pointerdown', (e) => { if (e.target.id === id) act(); });
+  function setMode(m) {
+    mode = m;
+    try { localStorage.setItem('stack-mode', m); } catch (e) {}
+    for (const b of document.querySelectorAll('.mode')) b.setAttribute('aria-pressed', String(b.dataset.mode === m));
+    $('mode-desc').textContent = M().desc;
+    if (state !== 'play') reset();
+    updateHud();
+  }
+  for (const b of document.querySelectorAll('.mode')) b.addEventListener('click', () => setMode(b.dataset.mode));
+  $('change').addEventListener('click', () => { state = 'ready'; $('over').hidden = true; $('start').hidden = false; reset(); });
   $('go').addEventListener('click', start);
   $('again').addEventListener('click', start);
   $('mute').addEventListener('click', (e) => {
@@ -290,7 +343,9 @@
   // ---- Update ----
   function update(dt) {
     if (state === 'play' && cur) {
-      cur.x += cur.dir * cur.speed * dt;
+      clock += dt;
+      const wob = 1 + M().wobble * Math.sin(clock * 2.3) * Math.sin(clock * 0.9 + 1);
+      cur.x += cur.dir * cur.speed * wob * dt;
       const minX = -cur.w * 0.5, maxX = LW - cur.w * 0.5;
       if (cur.x < minX) { cur.x = minX; cur.dir = 1; }
       if (cur.x > maxX) { cur.x = maxX; cur.dir = -1; }
@@ -317,12 +372,18 @@
     ctx.fillRect(x, y, w, 3); ctx.fillRect(x, y + BH - 3, w, 3);
     if (w > 12) { ctx.fillRect(x, y, 4, BH); ctx.fillRect(x + w - 4, y, 4, BH); }
     ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(x, y, w, 1);
-    if (no && w > 96) {
+    if (no && w > 60) {
       ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, BH); ctx.clip();
-      ctx.fillStyle = 'rgba(255,255,255,.88)';
-      ctx.font = '600 7.5px "IBM Plex Mono", ui-monospace, monospace';
-      ctx.fillText(no, x + 9, y + 13);
-      ctx.fillText(type, x + 9, y + 22);
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      ctx.font = '13px "Black Han Sans", "Apple SD Gothic Neo", sans-serif';
+      ctx.fillText(w > 150 ? 'TAEWOONG' : 'TGIU', x + 9, y + 20.5);
+      if (w > 120) {
+        ctx.textAlign = 'right';
+        ctx.font = '600 7px "IBM Plex Mono", ui-monospace, monospace';
+        ctx.fillText(no, x + w - 8, y + 13);
+        ctx.fillText(type, x + w - 8, y + 22);
+        ctx.textAlign = 'left';
+      }
       ctx.restore();
     }
   }
@@ -451,11 +512,11 @@
   }
 
   function boot(data) {
-    if (data && data.best > best) best = data.best;
-    resize(); reset(); updateHud();
+    if (data && data.bests) for (const k in bests) bests[k] = Math.max(bests[k], data.bests[k] || 0);
+    resize(); setMode(mode);
     requestAnimationFrame(frame);
   }
-  window.claude?.hot?.snapshot?.(() => ({ best }));
+  window.claude?.hot?.snapshot?.(() => ({ bests }));
   window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
 })();
 </script>
