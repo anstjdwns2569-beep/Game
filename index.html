@@ -3,521 +3,961 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0b1424">
+<meta name="theme-color" content="#252b41">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>컨테이너 쌓기</title>
+<title>TGIU 크레인 실습</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;600&family=IBM+Plex+Mono:wght@600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
-  /* Layout: one full-screen canvas (night container terminal), HUD and overlays floating above it.
-     Single dark look on purpose: the game is a night shift at the quay. */
+  /* Layout: crane-cab view (top-down canvas) on top, the cab's VMT terminal below.
+     Home and result screens cover the whole app. Single look on purpose: navy cab, red TGIU accents. */
   :root {
-    --night: #0b1424;
-    --night-2: #1b2a44;
-    --ink: #eaf0f7;
-    --ink-dim: #9fb0c6;
-    --sodium: #ffb547;
-    --brand: #cc231c;
-    --panel: rgba(9, 16, 29, 0.86);
-    --line: rgba(159, 176, 198, 0.22);
+    --navy: #252b41;
+    --navy-2: #1a1f30;
+    --red: #cc231c;
+    --ink: #f1f3f7;
+    --dim: #a9b0c2;
+    --line: rgba(255, 255, 255, 0.13);
+    --vmt: #0c1016;
+    --vmt-2: #151b24;
+    --amber: #ffb547;
+    --good: #6fdc9c;
+    --bad: #ff6b5e;
     --display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
     color-scheme: dark;
   }
   [hidden] { display: none !important; }
-  html { height: 100%; box-sizing: border-box; background: var(--night); }
+  html { height: 100%; box-sizing: border-box; background: var(--navy-2); }
+  *, *::before, *::after { box-sizing: inherit; }
   body {
-    height: 100%; margin: 0; overflow: hidden;
-    background: var(--night); color: var(--ink); font-family: var(--body);
-    touch-action: manipulation; user-select: none; -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+    height: 100%; margin: 0; overflow: hidden; background: var(--navy-2); color: var(--ink);
+    font-family: var(--body); -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none; touch-action: manipulation;
   }
-  #app { position: relative; height: 100%; overflow: hidden; }
-  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #app {
+    position: relative; height: 100%; max-width: 520px; margin: 0 auto;
+    display: flex; flex-direction: column; background: var(--navy); overflow: hidden;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
+  /* ---- game HUD ---- */
   .hud {
-    position: absolute; top: 0; left: 0; right: 0;
-    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
-    padding-top: calc(env(safe-area-inset-top, 0px) + 48px);
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
-    pointer-events: none;
+    display: flex; align-items: center; gap: 10px;
+    padding-block: calc(env(safe-area-inset-top, 0px) + 8px) 8px;
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    background: var(--navy); border-bottom: 1px solid var(--line);
   }
-  .score { font-family: var(--display); font-size: 56px; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
-  .score small { font-size: 20px; margin-left: 4px; color: var(--sodium); }
-  .meta { display: grid; justify-items: end; gap: 8px; }
-  .best { font-size: 13px; color: var(--ink-dim); letter-spacing: .02em; }
-  .best b { color: var(--ink); font-variant-numeric: tabular-nums; }
-  .chip {
-    pointer-events: auto; font: 600 12px var(--body); color: var(--ink);
-    background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
-    padding: 6px 12px; cursor: pointer;
-  }
-  .chip:focus-visible, .cta:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+  .hud-back { background: none; border: 1px solid var(--line); border-radius: 4px; padding: 5px 9px; font-size: 12px; }
+  .hud-title { flex: 1; min-width: 0; font: 400 17px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hud-title small { font: 600 11px var(--body); color: var(--dim); margin-left: 6px; }
+  .hud-stats { display: flex; gap: 12px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hud-stats b { color: var(--ink); font-size: 15px; }
+  .hud-stats .late b { color: var(--bad); }
 
-  .overlay {
-    position: absolute; inset: 0; display: grid; place-items: center;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
-    padding-block: 24px;
-    background: linear-gradient(to bottom, rgba(11,20,36,.15), rgba(11,20,36,.7));
+  .stage { position: relative; flex: 1 1 auto; min-height: 220px; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* ---- VMT (vehicle mounted terminal) ---- */
+  .vmt {
+    flex: 0 0 auto; max-height: 47%; overflow-y: auto;
+    background: var(--vmt); border-top: 2px solid #000; font-family: var(--mono);
+    padding-block: 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    display: grid; gap: 8px;
   }
-  .card {
-    width: min(100%, 340px); background: var(--panel); border: 1px solid var(--line);
-    border-radius: 6px; padding: 24px 22px; display: grid; gap: 14px;
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  .vmt-head { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--dim); letter-spacing: .06em; text-transform: uppercase; }
+  .vmt-head b { color: var(--amber); font-weight: 600; }
+  .job { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: baseline; background: var(--vmt-2); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
+  .job-label { grid-row: span 2; font: 600 11px var(--body); color: var(--amber); }
+  .job-no { font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: .02em; }
+  .job-loc { font-size: 11.5px; color: var(--dim); }
+  .job-loc b { color: var(--ink); }
+  .msg { font: 400 13px/1.45 var(--body); padding: 7px 10px; border-left: 3px solid var(--dim); background: rgba(255,255,255,.04); min-height: 2.9em; }
+  .msg.good { border-color: var(--good); }
+  .msg.bad { border-color: var(--bad); }
+  .msg.info { border-color: var(--amber); }
+  .bay { display: grid; gap: 2px; font-size: 9.5px; }
+  .bay-title { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); letter-spacing: .05em; }
+  .cell { height: 19px; border-radius: 2px; display: grid; place-items: center; background: rgba(255,255,255,.04); color: var(--ink); position: relative; font-variant-numeric: tabular-nums; }
+  .cell.box { background: #6b2320; }
+  .cell.box.navy { background: #2e3554; }
+  .cell.target { outline: 2px solid var(--amber); outline-offset: -2px; background: #8a5a12; }
+  .cell.pending { box-shadow: inset 0 -3px 0 var(--amber); }
+  .cell sup { position: absolute; top: -3px; right: 2px; color: var(--amber); font-size: 8.5px; font-weight: 600; }
+  .cell.plug { border: 1px dashed #5fb3ff; }
+  .lbl { color: var(--dim); display: grid; place-items: center; font-size: 9px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; font-size: 10.5px; }
+  .chip { border: 1px solid var(--line); border-radius: 3px; padding: 3px 6px; color: var(--dim); }
+  .chip.now { border-color: var(--amber); color: var(--ink); }
+  .chip.done { text-decoration: line-through; opacity: .55; }
+  .pod { display: inline-block; padding: 0 5px; border-radius: 2px; color: #11131a; font-weight: 600; }
+  .queue { display: grid; gap: 4px; font-size: 11.5px; }
+  .queue div { display: flex; gap: 8px; align-items: center; color: var(--dim); }
+  .queue div:first-child { color: var(--ink); font-size: 13px; }
+  .gauge { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 10.5px; color: var(--dim); }
+  .gauge-bar { position: relative; height: 10px; border-radius: 5px; background: linear-gradient(90deg, rgba(255,107,94,.45), rgba(111,220,156,.35) 38%, rgba(111,220,156,.35) 62%, rgba(255,107,94,.45)); }
+  .gauge-bar i { position: absolute; top: -3px; width: 3px; height: 16px; background: var(--ink); border-radius: 2px; transform: translateX(-50%); }
+  .gauge-bar em { position: absolute; top: -2px; bottom: -2px; border-left: 1px dashed rgba(255,255,255,.5); }
+
+  /* ---- full screens (home / result) ---- */
+  .screen {
+    position: absolute; inset: 0; z-index: 5; overflow-y: auto; background: var(--navy);
+    padding-block: calc(env(safe-area-inset-top, 0px) + 22px) calc(env(safe-area-inset-bottom, 0px) + 24px);
+    padding-left: max(18px, env(safe-area-inset-left, 0px));
+    padding-right: max(18px, env(safe-area-inset-right, 0px));
   }
-  .eyebrow { font: 600 11px var(--mono); letter-spacing: .14em; color: var(--sodium); text-transform: uppercase; }
-  h1, h2 { font-family: var(--display); font-weight: 400; margin: 0; line-height: 1.05; text-wrap: balance; }
-  h1 { font-size: 44px; }
-  h2 { font-size: 34px; }
-  .card p { margin: 0; color: var(--ink-dim); font-size: 14px; line-height: 1.55; }
-  .rules { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.45; }
-  .rules li { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: baseline; }
-  .rules span { font: 600 11px var(--mono); color: var(--sodium); letter-spacing: .06em; }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; border-block: 1px solid var(--line); padding-block: 12px; }
-  .stats div { display: grid; gap: 2px; }
-  .stats b { font-family: var(--display); font-weight: 400; font-size: 26px; font-variant-numeric: tabular-nums; }
-  .stats span { font-size: 11px; color: var(--ink-dim); letter-spacing: .04em; }
-  .rank { font-size: 15px; color: var(--ink); }
-  .rank b { color: var(--sodium); }
-  .cta {
-    font: 400 22px var(--display); color: #1a1205; background: var(--sodium);
-    border: 0; border-radius: 4px; padding: 14px; cursor: pointer;
-    box-shadow: 0 3px 0 #b5741a;
-  }
-  .cta:active { transform: translateY(2px); box-shadow: 0 1px 0 #b5741a; }
-  .hint { text-align: center; font-size: 12px !important; }
-  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .wrap { display: grid; gap: 16px; max-width: 440px; margin: 0 auto; }
+  .eyebrow { font: 600 11px var(--mono); letter-spacing: .14em; color: var(--amber); text-transform: uppercase; }
+  h1, h2 { font-family: var(--display); font-weight: 400; margin: 0; line-height: 1.08; text-wrap: balance; }
+  h1 { font-size: 40px; }
+  h1 span { color: var(--red); }
+  h2 { font-size: 32px; }
+  .lead { margin: 0; color: var(--dim); font-size: 14px; line-height: 1.6; }
+  .section-label { font: 600 12px var(--body); color: var(--dim); letter-spacing: .04em; margin-bottom: -6px; }
+  .modes { display: grid; gap: 10px; }
   .mode {
-    display: grid; gap: 3px; justify-items: start; text-align: left;
-    font: 400 12px var(--body); color: var(--ink-dim); line-height: 1.35;
-    background: transparent; border: 1px solid var(--line); border-radius: 4px;
-    padding: 10px 10px 9px; cursor: pointer;
+    text-align: left; background: var(--navy-2); border: 1px solid var(--line); border-radius: 6px;
+    padding: 14px; display: grid; grid-template-columns: 44px 1fr; gap: 4px 12px;
   }
-  .mode b { font: 400 19px var(--display); color: var(--ink); }
-  .mode[aria-pressed="true"] { border-color: var(--brand); background: rgba(204, 35, 28, 0.18); }
-  .mode[aria-pressed="true"] b { color: #fff; }
-  .mode:focus-visible, .ghost:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
-  .mode-desc { min-height: 2.9em; }
-  .ghost {
-    font: 600 14px var(--body); color: var(--ink); background: transparent;
-    border: 1px solid var(--line); border-radius: 4px; padding: 11px; cursor: pointer;
+  .mode[aria-pressed="true"] { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
+  .mode-icon { grid-row: span 3; width: 44px; height: 44px; border-radius: 4px; display: grid; place-items: center; font: 600 11px var(--mono); color: #fff; background: #3a4262; }
+  .mode[aria-pressed="true"] .mode-icon { background: var(--red); }
+  .mode b { font: 400 19px var(--display); }
+  .mode span { font-size: 13px; color: var(--dim); line-height: 1.5; }
+  .mode small { font: 500 10.5px var(--mono); color: var(--amber); letter-spacing: .03em; }
+  .diffs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .diff { background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 10px 4px; font: 400 18px var(--display); }
+  .diff[aria-pressed="true"] { border-color: var(--amber); background: rgba(255,181,71,.12); color: var(--amber); }
+  .diff-desc { margin: 0; font-size: 13px; color: var(--dim); line-height: 1.55; min-height: 4.6em; }
+  .best { font-size: 12px; color: var(--dim); }
+  .best b { color: var(--ink); }
+  .cta {
+    font: 400 21px var(--display); color: #fff; background: var(--red); border: 0; border-radius: 5px;
+    padding: 14px; box-shadow: 0 3px 0 #8a1611;
   }
-  .fineprint { font-size: 11px !important; color: rgba(159,176,198,.7) !important; }
-  @media (prefers-reduced-motion: no-preference) {
-    .overlay:not([hidden]) .card { animation: rise .35s ease-out; }
-  }
-  @keyframes rise { from { transform: translateY(14px); opacity: .4; } to { transform: none; opacity: 1; } }
+  .cta:active { transform: translateY(2px); box-shadow: 0 1px 0 #8a1611; }
+  .ghost { background: transparent; border: 1px solid var(--line); border-radius: 5px; padding: 12px; font-weight: 600; font-size: 14px; }
+  details { border-top: 1px solid var(--line); padding-top: 12px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  dl { margin: 10px 0 0; display: grid; gap: 10px; font-size: 13px; line-height: 1.5; }
+  dt { font-weight: 600; color: var(--ink); }
+  dd { margin: 0; color: var(--dim); }
+  .fine { margin: 0; font-size: 11px; color: rgba(169,176,194,.75); }
+
+  .score-row { display: flex; align-items: baseline; gap: 14px; }
+  .score-big { font: 400 64px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .stars { font-size: 26px; letter-spacing: 3px; color: var(--amber); }
+  .stars i { font-style: normal; color: rgba(255,255,255,.18); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; border-block: 1px solid var(--line); padding-block: 12px; }
+  .stats div { display: grid; gap: 2px; min-width: 0; }
+  .stats b { font: 400 22px var(--display); font-variant-numeric: tabular-nums; }
+  .stats span { font-size: 11px; color: var(--dim); }
+  .review { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .review li { background: var(--navy-2); border-left: 3px solid var(--bad); border-radius: 3px; padding: 10px 12px; font-size: 13px; line-height: 1.5; color: var(--dim); }
+  .review li.ok { border-color: var(--good); }
+  .review b { color: var(--ink); display: block; margin-bottom: 2px; }
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 </style>
 </head>
 <body>
 <div id="app">
-  <canvas id="c" aria-label="컨테이너 쌓기 게임 화면"></canvas>
+  <header class="hud">
+    <button class="hud-back" id="back" type="button">← 홈</button>
+    <div class="hud-title" id="hud-title">야드 이적·반출</div>
+    <div class="hud-stats">
+      <span id="hud-time-wrap"><span id="hud-time-label">트럭 대기</span> <b id="hud-time">00:00</b></span>
+      <span>점수 <b id="hud-score">100</b></span>
+    </div>
+  </header>
+  <div class="stage" id="stage"><canvas id="c" aria-label="크레인 운전석에서 내려다본 작업 화면. 열을 눌러 컨테이너를 집고 내려놓습니다."></canvas></div>
+  <section class="vmt" id="vmt" aria-live="polite"></section>
 
-  <div class="hud">
-    <div class="score" aria-live="polite"><span id="score">0</span><small>단</small></div>
-    <div class="meta">
-      <div class="best"><span id="hud-mode">중수</span> 최고 <b id="best">0</b>단</div>
-      <button class="chip" id="mute" type="button">소리 켜짐</button>
+  <div class="screen" id="home">
+    <div class="wrap">
+      <div class="eyebrow">TGIU · Crane training</div>
+      <h1><span>TGIU</span> 크레인 실습</h1>
+      <p class="lead">크레인 운전석에서 내려다보며 컨테이너를 다룹니다. 야드에서 반출할 컨테이너를 이적해 꺼내고, 부두에서 본선에 선적해 보세요.</p>
+
+      <div class="section-label">작업 선택</div>
+      <div class="modes">
+        <button class="mode" type="button" data-game="yard">
+          <div class="mode-icon">RTG</div>
+          <b>야드 이적·반출</b>
+          <span>반출 오더가 나온 컨테이너를 꺼내 트럭에 실어요. 위에 쌓인 컨테이너는 다른 열로 이적합니다.</span>
+          <small>이적 · 재취급 · 트럭 대기시간</small>
+        </button>
+        <button class="mode" type="button" data-game="ship">
+          <div class="mode-icon">STS</div>
+          <b>본선 선적</b>
+          <span>이적을 마친 수출 컨테이너를 선박에 실어요. 양하항 순서와 무게, 좌우 균형을 지켜야 합니다.</span>
+          <small>양하항(POD) · Overstow · 중량 · 횡경사</small>
+        </button>
+      </div>
+
+      <div class="section-label">난이도</div>
+      <div class="diffs" role="group" aria-label="난이도">
+        <button class="diff" type="button" data-diff="easy">초보</button>
+        <button class="diff" type="button" data-diff="normal">중수</button>
+        <button class="diff" type="button" data-diff="hard">고수</button>
+      </div>
+      <p class="diff-desc" id="diff-desc"></p>
+      <div class="best" id="home-best"></div>
+      <button class="cta" id="go" type="button">운전 시작</button>
+
+      <details>
+        <summary>현장 용어 정리</summary>
+        <dl>
+          <dt>RTG (트랜스퍼 크레인)</dt><dd>야드 블록을 가로질러 서서 컨테이너를 쌓고 꺼내는 크레인. 운전석은 트롤리에 매달려 있어 바로 아래를 내려다봅니다.</dd>
+          <dt>이적 (Shifting)</dt><dd>꺼낼 컨테이너 위에 쌓인 컨테이너를 다른 열로 옮기는 작업.</dd>
+          <dt>재취급 (Rehandling)</dt><dd>한 번 옮긴 컨테이너를 또 옮겨야 하는 상황. 장비 시간과 비용이 늘어납니다.</dd>
+          <dt>야드 위치 A03-15-04-2</dt><dd>블록 A03, 베이 15, 열(Row) 04, 단(Tier) 2. 단은 바닥이 1단입니다.</dd>
+          <dt>STS (안벽 크레인)</dt><dd>부두에서 선박으로 컨테이너를 싣고 내리는 크레인.</dd>
+          <dt>POD (양하항)</dt><dd>컨테이너를 내릴 항구. 먼저 들르는 항구의 컨테이너가 위에 있어야 합니다.</dd>
+          <dt>Overstow</dt><dd>나중에 내릴 컨테이너가 먼저 내릴 컨테이너 위에 실린 상태. 중간 항구에서 내렸다 다시 실어야(restow) 합니다.</dd>
+          <dt>본선 위치 13-02-84</dt><dd>베이 13, 열 02, 단 84. 갑판 위 단은 82부터 2씩 올라가고, 열은 중앙에서 바깥으로 우현이 홀수, 좌현이 짝수입니다.</dd>
+          <dt>횡경사 (Heel)</dt><dd>좌우 무게가 한쪽으로 쏠려 배가 기운 각도. 크면 하역과 운항이 위험해집니다.</dd>
+        </dl>
+      </details>
+      <p class="fine">태웅로직스 직원이 만든 비공식 교육용 게임입니다. 화면 속 수치와 규칙은 교육을 위해 단순화했습니다.</p>
     </div>
   </div>
 
-  <div class="overlay" id="start">
-    <div class="card">
-      <div class="eyebrow">TGIU · Night shift · Busan</div>
-      <h1>컨테이너 쌓기</h1>
-      <p>갠트리 크레인이 TGIU 컨테이너를 좌우로 옮기고 있어요. 아래 컨테이너 위에 정확히 내려놓아 최대한 높이 쌓아 보세요.</p>
-      <ul class="rules">
-        <li><span>TAP</span>화면을 탭하면 컨테이너를 내립니다.</li>
-        <li><span>CUT</span>어긋난 부분은 잘려서 바다로 떨어져요.</li>
-        <li><span>COMBO</span>연속으로 딱 맞추면 폭이 다시 넓어집니다.</li>
-      </ul>
-      <div class="modes" role="group" aria-label="난이도">
-        <button class="mode" type="button" data-mode="easy"><b>초보</b>천천히</button>
-        <button class="mode" type="button" data-mode="normal"><b>중수</b>보통 속도</button>
-        <button class="mode" type="button" data-mode="hard"><b>고수</b>빠르고 불규칙</button>
+  <div class="screen" id="result" hidden>
+    <div class="wrap">
+      <div class="eyebrow" id="r-eyebrow">작업 종료</div>
+      <h2 id="r-title">작업 완료</h2>
+      <div class="score-row"><div class="score-big" id="r-score">100</div><div class="stars" id="r-stars"></div></div>
+      <div class="stats" id="r-stats"></div>
+      <div class="section-label">작업 복기</div>
+      <ul class="review" id="r-review"></ul>
+      <div class="btns">
+        <button class="cta" id="again" type="button">다시 하기</button>
+        <button class="ghost" id="r-home" type="button">홈으로</button>
       </div>
-      <p class="mode-desc" id="mode-desc"></p>
-      <button class="cta" id="go" type="button">작업 시작</button>
-      <p class="fineprint">태웅로직스 직원이 만든 비공식 사내 게임입니다.</p>
-    </div>
-  </div>
-
-  <div class="overlay" id="over" hidden>
-    <div class="card">
-      <div class="eyebrow" id="r-mode">Stack collapsed</div>
-      <h2>적재 실패!</h2>
-      <div class="stats">
-        <div><b id="r-score">0</b><span>이번 기록 (단)</span></div>
-        <div><b id="r-best">0</b><span id="r-best-label">최고 기록 (단)</span></div>
-        <div><b id="r-perfect">0</b><span>정확 적재</span></div>
-      </div>
-      <div class="rank">오늘의 등급: <b id="r-rank">수습 크레인 기사</b></div>
-      <button class="cta" id="again" type="button">다시 하기</button>
-      <button class="ghost" id="change" type="button">난이도 바꾸기</button>
-      <p class="hint">스페이스바 또는 화면 탭으로도 조작할 수 있어요.</p>
     </div>
   </div>
 </div>
 
 <script>
 (() => {
-  // ---- World constants (logical units; the canvas is scaled to fit 360 units wide) ----
-  const LW = 360, BH = 30, GROUND_PAD = 120;
-  // Difficulty: crane speed (start / per tier / cap), how close counts as "정확",
-  // perfect drops needed to widen, how much it widens, base width, and speed wobble.
-  const MODES = {
-    easy:   { name: '초보', speed: 85,  ramp: 4,  cap: 210, tol: 8,   combo: 2, grow: 14, base: 220, wobble: 0,
-              desc: '크레인이 천천히 움직이고, 판정이 넉넉해요. 2번 연속 정확하면 폭이 넓어집니다.' },
-    normal: { name: '중수', speed: 115, ramp: 7,  cap: 320, tol: 4,   combo: 3, grow: 10, base: 200, wobble: 0,
-              desc: '단수가 올라갈수록 빨라져요. 3번 연속 정확하면 폭이 넓어집니다.' },
-    hard:   { name: '고수', speed: 150, ramp: 10, cap: 430, tol: 2.5, combo: 4, grow: 6,  base: 170, wobble: 0.45,
-              desc: '크레인 속도가 계속 출렁이고 판정이 엄격해요. 시작 폭도 좁습니다.' },
+  // ================= config =================
+  const LW = 360; // logical canvas width; height follows the stage
+  const YARD = {
+    easy:   { rows: 4, tiers: 3, orders: 2, fill: 0.58, hintTarget: true,  hintPlace: true,  waitLimit: 0,
+              desc: '4열 3단 야드, 반출 2건. 꺼낼 컨테이너와 내려놓기 좋은 열을 화면에 표시해 줍니다.' },
+    normal: { rows: 6, tiers: 4, orders: 3, fill: 0.62, hintTarget: true,  hintPlace: false, waitLimit: 0,
+              desc: '6열 4단 야드, 반출 3건. 꺼낼 컨테이너만 표시됩니다. 다음 오더를 보고 이적 위치를 직접 판단하세요.' },
+    hard:   { rows: 6, tiers: 5, orders: 4, fill: 0.66, hintTarget: false, hintPlace: false, waitLimit: 45,
+              desc: '6열 5단 야드, 반출 4건. 화면 표시 없이 VMT 위치 정보만 보고 작업합니다. 트럭이 45초 넘게 기다리면 감점.' },
   };
-  // TGIU livery: brand red, a deeper red and navy so neighbouring tiers stay distinguishable.
-  const COLORS = [['#cc231c', '#a51b15'], ['#a91f1a', '#861612'], ['#252b41', '#1b2032']];
-  const RANKS = [[0, '수습 크레인 기사'], [8, '숙련 크레인 기사'], [18, '베테랑 갠트리 기사'], [30, '터미널의 전설']];
+  const SHIP = {
+    easy:   { rows: 5, tiers: 3, count: 10, pods: 2, weights: false, reefer: false, heelLimit: 0,
+              desc: '5열 3단, 10개 선적. 양하항 2곳(상하이·닝보)만 순서대로 쌓으면 됩니다.' },
+    normal: { rows: 6, tiers: 4, count: 16, pods: 3, weights: true,  reefer: false, heelLimit: 0,
+              desc: '6열 4단, 16개 선적. 양하항 3곳에 무게까지 고려합니다. 무거운 컨테이너는 아래로.' },
+    hard:   { rows: 6, tiers: 4, count: 20, pods: 3, weights: true,  reefer: true,  heelLimit: 2,
+              desc: '6열 4단, 20개 선적. 냉동 컨테이너는 플러그 열에만, 작업 종료 시 횡경사 2° 이내여야 합니다.' },
+  };
+  const PORTS = [
+    { code: 'SHA', name: '상하이', color: '#f2b23a' },
+    { code: 'NGB', name: '닝보', color: '#3fc2b2' },
+    { code: 'SIN', name: '싱가포르', color: '#b597f0' },
+  ];
+  const COLORS = [['#cc231c', '#a51b15'], ['#a91f1a', '#861612'], ['#2e3554', '#1f2438']];
+  const PEN = {
+    unneeded:    { name: '불필요한 이적', tip: '반출 대상 위에 있지 않은 컨테이너를 옮기면 장비 시간과 연료만 늘어납니다. VMT에서 대상 위치를 먼저 확인하세요.' },
+    buryCurrent: { name: '반출 대상 위에 적재', tip: '꺼내야 할 컨테이너 위에 다시 올리면 같은 작업을 한 번 더 해야 합니다.' },
+    buryFuture:  { name: '재취급 유발', tip: '다음 반출 예정 컨테이너 위에 올리면 그 트럭이 왔을 때 또 이적해야 합니다. 오더 목록을 미리 보고 반출 예정이 없는 열에 두세요.' },
+    wait:        { name: '트럭 대기 초과', tip: '트럭 대기시간(턴어라운드)이 길어지면 게이트가 막히고 운송사 비용이 늘어납니다.' },
+    overstow:    { name: 'Overstow', tip: '먼저 들르는 항구(POD)의 컨테이너가 위에 있어야 합니다. 반대로 실으면 중간 항구에서 내렸다 다시 싣는 restow 비용이 생깁니다.' },
+    weight:      { name: '중량 역적재', tip: '무거운 컨테이너는 아래에 둡니다. 위가 무거우면 무게중심이 높아지고 래싱(고박)에 무리가 갑니다.' },
+    reefer:      { name: '리퍼 슬롯 위반', tip: '냉동 컨테이너(22R1)는 전원 플러그가 있는 열에 실어야 온도를 유지할 수 있습니다.' },
+    heel:        { name: '횡경사 초과', tip: '한쪽에 무게가 쏠리면 배가 기울어 하역과 운항이 위험합니다. 좌현·우현에 번갈아 실어 균형을 맞추세요.' },
+  };
 
-  const cvs = document.getElementById('c');
-  const ctx = cvs.getContext('2d');
+  // ================= helpers =================
   const $ = (id) => document.getElementById(id);
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rand = (n) => Math.floor(Math.random() * n);
+  const pick = (a) => a[rand(a.length)];
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const now = () => performance.now();
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const fmtTime = (s) => `${pad2(Math.floor(s / 60))}:${pad2(Math.floor(s % 60))}`;
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  };
 
-  let scale = 1, LH = 640;
-  let state = 'ready', stack = [], cur = null, debris = [], pops = [], flashes = [];
-  let cam = 0, score = 0, combo = 0, perfects = 0, shake = 0, muted = false, overAt = 0, clock = 0;
-  let mode = 'normal', bests = { easy: 0, normal: 0, hard: 0 };
-  const M = () => MODES[mode];
-  const stars = Array.from({ length: 70 }, () => ({ x: Math.random() * LW, y: Math.random(), r: Math.random() * 1.2 + 0.3 }));
-
-  try {
-    for (const k in bests) bests[k] = +localStorage.getItem('stack-best-' + k) || 0;
-    bests.normal = Math.max(bests.normal, +localStorage.getItem('stack-best') || 0);
-    if (MODES[localStorage.getItem('stack-mode')]) mode = localStorage.getItem('stack-mode');
-    muted = localStorage.getItem('stack-muted') === '1';
-  } catch (e) {}
-
-  // ---- ISO 6346 container number with a real check digit ----
+  // ISO 6346 container number with a real check digit
   const LETTER = {};
   (() => { let v = 10; for (const ch of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') { if (v % 11 === 0) v++; LETTER[ch] = v++; } })();
+  const used = new Set();
   function containerNo() {
-    const owner = 'TGIU', serial = String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
-    const code = owner + serial;
+    let serial;
+    do { serial = String(rand(1e6)).padStart(6, '0'); } while (used.has(serial));
+    used.add(serial);
+    const code = 'TGIU' + serial;
     let sum = 0;
     for (let i = 0; i < 10; i++) sum += (LETTER[code[i]] ?? +code[i]) * 2 ** i;
-    return `${owner} ${serial} ${(sum % 11) % 10}`;
+    return { no: `TGIU ${serial} ${(sum % 11) % 10}`, short: serial.slice(2) };
   }
+  function makeBox(extra = {}) {
+    const n = containerNo();
+    return { no: n.no, short: n.short, c: rand(COLORS.length), type: '22G1', ...extra };
+  }
+  const plate = () => `부산${90 + rand(10)}사 ${1000 + rand(9000)}`;
 
-  // ---- Sound (starts only after the first tap) ----
-  let ac = null;
-  function beep(freq, dur, type = 'triangle', vol = 0.25) {
-    if (muted) return;
-    try {
-      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
-      const o = ac.createOscillator(), g = ac.createGain();
-      o.type = type; o.frequency.setValueAtTime(freq, ac.currentTime);
-      o.frequency.exponentialRampToValueAtTime(Math.max(40, freq * 0.6), ac.currentTime + dur);
-      g.gain.setValueAtTime(vol, ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
-      o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
-    } catch (e) {}
+  // Ship rows: port side even numbers (left), starboard odd (right), counted out from the centreline.
+  function shipRowLabels(R) {
+    const half = Math.floor(R / 2), out = [];
+    for (let i = half; i >= 1; i--) out.push(pad2(i * 2));
+    if (R % 2) out.push('00');
+    for (let i = 1; i <= half; i++) out.push(pad2(i * 2 - 1));
+    return out;
   }
+  const yardLoc = (r, i) => `A03-15-${pad2(r + 1)}-${i + 1}`;
+
   const buzz = (ms) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
 
-  // ---- Layout ----
+  // ================= state =================
+  const cvs = $('c'), ctx = cvs.getContext('2d');
+  let scale = 1, LH = 500, L = null, G = null;
+  const crane = { x: 0, q: [], carrying: null, wait: 0 };
+  const truck = { off: 0, state: 'idle', box: null, cb: null };
+  let sel = { game: store.get('edu-game') === 'ship' ? 'ship' : 'yard', diff: ['easy', 'normal', 'hard'].includes(store.get('edu-diff')) ? store.get('edu-diff') : 'easy' };
+  const bestKey = (g, d) => `edu-best-${g}-${d}`;
+
+  // ================= layout =================
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = cvs.clientWidth, h = cvs.clientHeight;
+    if (!w || !h) return;
     cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr);
     scale = w / LW; LH = h / scale;
     ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
+    if (G) computeLayout();
   }
-  const groundY = () => LH - GROUND_PAD;
-  const sy = (yW) => groundY() - (yW - cam); // screen y of a world height
-
-  // ---- Game flow ----
-  function reset() {
-    stack = [{ x: (LW - M().base) / 2, w: M().base, base: true }];
-    debris = []; pops = []; flashes = [];
-    score = 0; combo = 0; perfects = 0; cam = 0; clock = 0;
-    newCur();
-    updateHud();
-  }
-  function newCur() {
-    const top = stack[stack.length - 1];
-    const fromLeft = stack.length % 2 === 0;
-    let c;
-    do { c = Math.floor(Math.random() * COLORS.length); } while (top.c === c);
-    cur = {
-      w: top.w, x: fromLeft ? -top.w * 0.5 : LW - top.w * 0.5, dir: fromLeft ? 1 : -1,
-      speed: Math.min(M().speed + score * M().ramp, M().cap), c, no: containerNo(), type: top.w > 150 ? '45G1' : '22G1',
-    };
-  }
-  function start() {
-    reset(); state = 'play';
-    $('start').hidden = true; $('over').hidden = true;
-  }
-  function drop() {
-    const top = stack[stack.length - 1];
-    const yW = stack.length * BH;
-    if (Math.abs(cur.x - top.x) <= M().tol) {
-      combo++; perfects++;
-      let { x, w } = top;
-      if (combo >= M().combo && w < M().base) { const g = Math.min(M().grow, M().base - w); w += g; x -= g / 2; }
-      stack.push({ x, w, c: cur.c, no: cur.no, type: cur.type });
-      flashes.push({ x, w, yW, life: 1 });
-      pops.push({ text: combo > 1 ? `정확! ×${combo}` : '정확!', x: x + w / 2, yW: yW + BH, life: 1 });
-      beep(520 + Math.min(combo, 8) * 70, 0.18, 'sine', 0.2); buzz(15);
+  function computeLayout() {
+    const R = G.R, margin = 14, gap = 20;
+    const colW = (LW - margin * 2 - gap) / (R + 1);
+    const cw = Math.min(46, colW - 8);
+    const cl = Math.min(cw * 2.45, LH * 0.3);
+    const rowX = [];
+    let laneX;
+    if (G.kind === 'yard') {
+      for (let r = 0; r < R; r++) rowX.push(margin + colW * (r + 0.5));
+      laneX = margin + gap + colW * (R + 0.5);
     } else {
-      const left = Math.max(cur.x, top.x), right = Math.min(cur.x + cur.w, top.x + top.w);
-      const ov = right - left;
-      if (ov <= 0) {
-        debris.push({ x: cur.x, w: cur.w, yW, vy: 0, vx: cur.dir * 60, rot: 0, vr: cur.dir * 1.8, c: cur.c, no: cur.no, type: cur.type });
-        cur = null;
-        return gameOver();
-      }
-      combo = 0;
-      const leftCut = cur.x < top.x;
-      debris.push({ x: leftCut ? cur.x : right, w: cur.w - ov, yW, vy: 0, vx: leftCut ? -40 : 40, rot: 0, vr: leftCut ? -2.2 : 2.2, c: cur.c });
-      stack.push({ x: left, w: ov, c: cur.c, no: cur.no, type: cur.type });
-      beep(110, 0.16); buzz(10);
+      laneX = margin + colW * 0.5;
+      for (let r = 0; r < R; r++) rowX.push(margin + gap + colW * (r + 1.5));
     }
-    shake = reduceMotion ? 0 : 3;
-    score = stack.length - 1;
-    updateHud();
-    newCur();
+    L = { colW, cw, cl, rowX, laneX, bayY: LH * 0.47, bayGap: cl + 66, margin, gap };
+    if (!crane.q.length) crane.x = crane.carrying ? crane.x : laneX;
   }
-  function gameOver() {
-    state = 'over'; overAt = performance.now();
-    beep(70, 0.6, 'sawtooth', 0.18); buzz([30, 40, 60]);
-    if (score > bests[mode]) { bests[mode] = score; try { localStorage.setItem('stack-best-' + mode, score); } catch (e) {} }
+  function hitCol(x) {
+    if (Math.abs(x - L.laneX) < L.colW / 2 + 6) return 'lane';
+    for (let r = 0; r < G.R; r++) if (Math.abs(x - L.rowX[r]) < L.colW / 2 + 2) return r;
+    return null;
+  }
+
+  // ================= crane / truck motion =================
+  const busy = () => crane.q.length > 0 || truck.state !== 'idle';
+  function go(x, cb) { crane.q.push({ x, cb, t: 0 }); }
+  function truckMove(state, cb) { truck.state = state; truck.cb = cb; }
+  function truckArrive(box, cb) {
+    truck.box = box;
+    truck.off = G.kind === 'yard' ? -LH : LH;
+    truckMove('in', cb);
+  }
+
+  // ================= game setup =================
+  function startGame() {
+    used.clear();
+    const kind = sel.game, diff = sel.diff;
+    const cfg = (kind === 'yard' ? YARD : SHIP)[diff];
+    G = { kind, diff, cfg, R: cfg.rows, T: cfg.tiers, score: 100, pen: [], moves: 0, t0: now(), floats: [], done: false,
+          msg: '', msgKind: 'info' };
+    crane.q = []; crane.carrying = null;
+    if (kind === 'yard') setupYard(); else setupShip();
+    $('home').hidden = true; $('result').hidden = true;
+    resize(); computeLayout(); crane.x = L.laneX;
+    $('hud-title').innerHTML = `${kind === 'yard' ? '야드 이적·반출' : '본선 선적'}<small>${{ easy: '초보', normal: '중수', hard: '고수' }[diff]}</small>`;
+    $('hud-time-label').textContent = kind === 'yard' ? '트럭 대기' : '경과';
+    renderVMT(); updateHud();
+  }
+
+  function setupYard() {
+    const { R, T, cfg } = G;
+    G.stacks = Array.from({ length: R }, () => []);
+    let n = Math.round(R * T * cfg.fill);
+    while (n > 0) { const r = rand(R); if (G.stacks[r].length < T) { G.stacks[r].push(makeBox()); n--; } }
+    G.neighbors = [-2, -1, 1, 2].map((k) => ({ k, stacks: Array.from({ length: R }, () => Array.from({ length: rand(T + 1) }, () => makeBox())) }));
+    // Orders: prefer containers that are buried, so the player has to shift.
+    const all = [];
+    G.stacks.forEach((s) => s.forEach((b, i) => all.push({ b, depth: s.length - 1 - i })));
+    shuffle(all).sort((a, b) => (b.depth > 0) - (a.depth > 0));
+    G.orders = shuffle(all.slice(0, cfg.orders)).map((x) => ({ box: x.b, done: false, truck: plate(), wait: 0 }));
+    G.oi = 0; G.truckT0 = now(); G.src = -1; G.srcBlocking = false;
+    truck.box = null; truck.off = 0; truck.state = 'idle';
+    say(`반출 오더 ${G.orders.length}건이 들어왔습니다. 첫 번째 트럭이 차선에 대기 중입니다.`, 'info');
+  }
+
+  function setupShip() {
+    const { R, T, cfg } = G;
+    G.stacks = Array.from({ length: R }, () => []);
+    G.labels = shipRowLabels(R);
+    G.plug = cfg.reefer ? [0, R - 1] : [];
+    let reefers = 0;
+    G.queue = Array.from({ length: cfg.count }, () => {
+      const reefer = cfg.reefer && reefers < G.plug.length * T - 2 && Math.random() < 0.22;
+      if (reefer) reefers++;
+      return makeBox({ pod: rand(cfg.pods), w: cfg.weights ? pick([6, 10, 14, 18, 22, 26]) : 14, reefer, type: reefer ? '22R1' : '22G1' });
+    });
+    G.total = cfg.count; G.loaded = 0;
+    G.neighbors = [-2, -1, 1, 2].map((k) => ({ k, stacks: Array.from({ length: R }, () => Array.from({ length: rand(3) }, () => makeBox({ pod: rand(3), w: 14 }))) }));
+    truck.off = 0; truck.state = 'idle'; truck.box = G.queue[0];
+    say('선적 순서대로 컨테이너가 도착합니다. 실을 열을 누르세요. 다음 두 개도 미리 확인할 수 있어요.', 'info');
+  }
+
+  // ================= messages / scoring =================
+  function say(text, kind = 'info') { G.msg = text; G.msgKind = kind; const m = document.querySelector('.msg'); if (m) { m.textContent = text; m.className = 'msg ' + kind; } }
+  function float(col, text, kind) {
+    const x = col === 'lane' ? L.laneX : L.rowX[col];
+    G.floats.push({ x, y: L.bayY - L.cl / 2 - 10, text, kind, life: 1 });
+  }
+  function penalize(type, pts, col) {
+    G.score = Math.max(0, G.score - pts);
+    G.pen.push({ type, pts });
+    float(col, `−${pts}`, 'bad');
+    buzz(40);
     updateHud();
-    let rank = RANKS[0][1];
-    for (const [min, name] of RANKS) if (score >= min) rank = name;
-    $('r-score').textContent = score; $('r-best').textContent = bests[mode];
-    $('r-best-label').textContent = `${M().name} 최고 (단)`;
-    $('r-mode').textContent = `Stack collapsed · ${M().name} 모드`;
-    $('r-perfect').textContent = perfects; $('r-rank').textContent = rank;
-    setTimeout(() => { if (state === 'over') $('over').hidden = false; }, 700);
   }
   function updateHud() {
-    $('score').textContent = score; $('best').textContent = bests[mode]; $('hud-mode').textContent = M().name;
-    $('mute').textContent = muted ? '소리 꺼짐' : '소리 켜짐';
-  }
-  function act() {
-    if (state === 'play') drop();
-    else if (state === 'ready') start();
-    else if (state === 'over' && performance.now() - overAt > 900) start();
+    $('hud-score').textContent = G ? G.score : 100;
   }
 
-  // ---- Input ----
-  cvs.addEventListener('pointerdown', (e) => { e.preventDefault(); act(); });
-  for (const id of ['start', 'over']) $(id).addEventListener('pointerdown', (e) => { if (e.target.id === id) act(); });
-  function setMode(m) {
-    mode = m;
-    try { localStorage.setItem('stack-mode', m); } catch (e) {}
-    for (const b of document.querySelectorAll('.mode')) b.setAttribute('aria-pressed', String(b.dataset.mode === m));
-    $('mode-desc').textContent = M().desc;
-    if (state !== 'play') reset();
-    updateHud();
+  // ================= yard play =================
+  const curTarget = () => G.orders[G.oi] && G.orders[G.oi].box;
+  const isFuture = (b) => G.orders.some((o, i) => i > G.oi && !o.done && o.box === b);
+  function findBox(b) {
+    for (let r = 0; r < G.R; r++) { const i = G.stacks[r].indexOf(b); if (i >= 0) return { r, i, above: G.stacks[r].length - 1 - i }; }
+    return null;
   }
-  for (const b of document.querySelectorAll('.mode')) b.addEventListener('click', () => setMode(b.dataset.mode));
-  $('change').addEventListener('click', () => { state = 'ready'; $('over').hidden = true; $('start').hidden = false; reset(); });
-  $('go').addEventListener('click', start);
-  $('again').addEventListener('click', start);
-  $('mute').addEventListener('click', (e) => {
-    e.stopPropagation(); muted = !muted;
-    try { localStorage.setItem('stack-muted', muted ? '1' : '0'); } catch (err) {}
-    updateHud();
-  });
-  addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.code === 'Enter') {
-      if (document.activeElement && document.activeElement.tagName === 'BUTTON' && state !== 'play') return;
-      e.preventDefault(); act();
+
+  function yardTap(col) {
+    const tgt = curTarget();
+    if (col === 'lane') {
+      if (!crane.carrying) { const p = findBox(tgt); say(`먼저 반출 대상을 집으세요. 위치 ${yardLoc(p.r, p.i)} (${pad2(p.r + 1)}열 ${p.i + 1}단).`, 'info'); return; }
+      if (crane.carrying !== tgt) { say('이 컨테이너는 반출 대상이 아닙니다. 다른 열에 내려놓으세요.', 'bad'); buzz(20); return; }
+      go(L.laneX, () => { truck.box = crane.carrying; crane.carrying = null; gateOut(); });
+      return;
     }
-  });
-  addEventListener('resize', resize);
-
-  // ---- Update ----
-  function update(dt) {
-    if (state === 'play' && cur) {
-      clock += dt;
-      const wob = 1 + M().wobble * Math.sin(clock * 2.3) * Math.sin(clock * 0.9 + 1);
-      cur.x += cur.dir * cur.speed * wob * dt;
-      const minX = -cur.w * 0.5, maxX = LW - cur.w * 0.5;
-      if (cur.x < minX) { cur.x = minX; cur.dir = 1; }
-      if (cur.x > maxX) { cur.x = maxX; cur.dir = -1; }
+    const r = col, st = G.stacks[r];
+    if (!crane.carrying) {
+      if (!st.length) { say(`${pad2(r + 1)}열은 비어 있습니다.`, 'info'); return; }
+      go(L.rowX[r], () => {
+        crane.carrying = st.pop(); G.src = r; G.srcBlocking = st.includes(tgt);
+        if (crane.carrying === tgt) say('반출 대상을 집었습니다. 오른쪽 트럭 차선을 눌러 상차하세요.', 'good');
+        else if (G.srcBlocking) say('반출 대상 위의 컨테이너를 집었습니다. 다음 반출 예정이 없는 열에 이적하세요.', 'info');
+        else say('이 열에는 반출 대상이 없습니다. 같은 열을 다시 누르면 제자리에 내려놓습니다.', 'bad');
+        renderVMT();
+      });
+      return;
     }
-    const topW = (stack.length + 1) * BH;
-    const camT = Math.max(0, topW - groundY() + LH * 0.38);
-    cam += (camT - cam) * Math.min(1, dt * 5);
-    for (const d of debris) { d.vy += 1500 * dt; d.yW -= d.vy * dt; d.x += d.vx * dt; d.rot += d.vr * dt; }
-    debris = debris.filter((d) => sy(d.yW) < LH + 200);
-    for (const p of pops) p.life -= dt * 0.9;
-    pops = pops.filter((p) => p.life > 0);
-    for (const f of flashes) f.life -= dt * 2.5;
-    flashes = flashes.filter((f) => f.life > 0);
-    shake *= Math.pow(0.001, dt);
+    if (r === G.src) {
+      go(L.rowX[r], () => { st.push(crane.carrying); crane.carrying = null; say('제자리에 내려놓았습니다.', 'info'); renderVMT(); });
+      return;
+    }
+    if (st.length >= G.T) { say(`${pad2(r + 1)}열은 최대 ${G.T}단으로 꽉 찼습니다.`, 'bad'); buzz(20); return; }
+    go(L.rowX[r], () => {
+      const b = crane.carrying; crane.carrying = null; G.moves++;
+      let bad = false;
+      if (b === tgt || !G.srcBlocking) { penalize('unneeded', 5, r); bad = true; }
+      if (st.includes(tgt)) { penalize('buryCurrent', 10, r); bad = true; }
+      else if (st.some(isFuture)) { penalize('buryFuture', 8, r); bad = true; }
+      st.push(b);
+      if (!bad) { say(`${pad2(r + 1)}열 ${st.length}단에 이적했습니다. 다음 반출에 방해되지 않는 좋은 위치예요.`, 'good'); float(r, '좋아요', 'good'); }
+      else say(PEN[G.pen[G.pen.length - 1].type].tip, 'bad');
+      const p = findBox(tgt);
+      if (p && p.above === 0) say(G.msg + ' 이제 반출 대상이 맨 위에 있습니다.', G.msgKind);
+      renderVMT();
+    });
   }
 
-  // ---- Draw ----
-  function drawContainer(x, y, w, c, no, type) {
-    const [body, rib] = COLORS[c];
-    ctx.fillStyle = body; ctx.fillRect(x, y, w, BH);
-    ctx.fillStyle = rib;
-    for (let i = x + 5; i < x + w - 4; i += 6) ctx.fillRect(i, y + 4, 2, BH - 8);
-    ctx.fillStyle = 'rgba(0,0,0,.3)';
-    ctx.fillRect(x, y, w, 3); ctx.fillRect(x, y + BH - 3, w, 3);
-    if (w > 12) { ctx.fillRect(x, y, 4, BH); ctx.fillRect(x + w - 4, y, 4, BH); }
-    ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(x, y, w, 1);
-    if (no && w > 60) {
-      ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, BH); ctx.clip();
-      ctx.fillStyle = 'rgba(255,255,255,.92)';
-      ctx.font = '13px "Black Han Sans", "Apple SD Gothic Neo", sans-serif';
-      ctx.fillText(w > 150 ? 'TAEWOONG' : 'TGIU', x + 9, y + 20.5);
-      if (w > 120) {
-        ctx.textAlign = 'right';
-        ctx.font = '600 7px "IBM Plex Mono", ui-monospace, monospace';
-        ctx.fillText(no, x + w - 8, y + 13);
-        ctx.fillText(type, x + w - 8, y + 22);
-        ctx.textAlign = 'left';
+  function gateOut() {
+    const o = G.orders[G.oi];
+    o.done = true; o.wait = (now() - G.truckT0) / 1000;
+    if (G.cfg.waitLimit && o.wait > G.cfg.waitLimit) penalize('wait', 10, 'lane');
+    say(`반출 완료. ${o.truck} 트럭 출발 (대기 ${fmtTime(o.wait)}).`, 'good');
+    float('lane', '반출', 'good'); buzz(15);
+    renderVMT();
+    truckMove('out', () => {
+      truck.box = null; G.oi++;
+      if (G.oi >= G.orders.length) return finish();
+      truckArrive(null, () => {
+        G.truckT0 = now();
+        const p = findBox(curTarget());
+        say(`다음 트럭 ${G.orders[G.oi].truck} 도착. 반출 대상은 ${pad2(p.r + 1)}열 ${p.i + 1}단, 위에 ${p.above}개.`, 'info');
+        renderVMT();
+      });
+      renderVMT();
+    });
+  }
+
+  // ================= ship play =================
+  function heel() {
+    const c = (G.R - 1) / 2;
+    let m = 0;
+    G.stacks.forEach((s, r) => s.forEach((b) => { m += b.w * (r - c); }));
+    return m * 0.022; // simplified: degrees; negative = port (left), positive = starboard (right)
+  }
+  function shipTap(col) {
+    if (!G.queue.length) return;
+    if (col === 'lane') { say('트럭 위 컨테이너를 실을 선박의 열(Row)을 누르세요.', 'info'); return; }
+    const r = col, st = G.stacks[r];
+    if (st.length >= G.T) { say(`${G.labels[r]}열은 최대 ${G.T}단으로 꽉 찼습니다.`, 'bad'); buzz(20); return; }
+    go(L.laneX, () => {
+      crane.carrying = G.queue.shift(); truck.box = null;
+      truckMove('out', () => { if (G.queue.length) truckArrive(G.queue[0], () => renderVMT()); });
+      renderVMT();
+    });
+    go(L.rowX[r], () => {
+      const b = crane.carrying; crane.carrying = null;
+      const below = st[st.length - 1];
+      let bad = false;
+      if (st.some((x) => x.pod < b.pod)) {
+        penalize('overstow', 15, r); bad = true;
+        const early = st.find((x) => x.pod < b.pod);
+        say(`Overstow: ${PORTS[b.pod].name}행이 ${PORTS[early.pod].name}행 위에 실렸습니다. ${PORTS[early.pod].name}에서 restow가 필요합니다.`, 'bad');
       }
-      ctx.restore();
+      if (G.cfg.weights && below && below.w < b.w) {
+        penalize('weight', 8, r);
+        if (!bad) say(`중량 역적재: ${b.w}t 컨테이너가 ${below.w}t 위에 실렸습니다. 무거운 것은 아래로.`, 'bad');
+        bad = true;
+      }
+      if (b.reefer && !G.plug.includes(r)) {
+        penalize('reefer', 15, r);
+        if (!bad) say('냉동 컨테이너를 플러그가 없는 열에 실었습니다. 파란 점선 열이 리퍼 슬롯입니다.', 'bad');
+        bad = true;
+      }
+      st.push(b); G.loaded++;
+      if (!bad) { say(`${PORTS[b.pod].name}행 ${b.no}, 13-${G.labels[r]}-${82 + (st.length - 1) * 2} 적재 완료.`, 'good'); float(r, '적재', 'good'); }
+      if (!G.queue.length) finish();
+      renderVMT();
+    });
+  }
+
+  // ================= finish / result =================
+  function finish() {
+    if (G.done) return;
+    G.done = true;
+    if (G.kind === 'ship' && G.cfg.heelLimit && Math.abs(heel()) > G.cfg.heelLimit) penalize('heel', 20, Math.floor(G.R / 2));
+    const k = bestKey(G.kind, G.diff);
+    if (G.score > (+store.get(k) || 0)) store.set(k, G.score);
+    G.elapsed = (now() - G.t0) / 1000;
+    renderVMT();
+    setTimeout(showResult, 900);
+  }
+
+  function showResult() {
+    const s = G.score;
+    const stars = s >= 90 ? 3 : s >= 70 ? 2 : s >= 40 ? 1 : 0;
+    $('r-eyebrow').textContent = `${G.kind === 'yard' ? '야드 이적·반출' : '본선 선적'} · ${{ easy: '초보', normal: '중수', hard: '고수' }[G.diff]}`;
+    $('r-title').textContent = s >= 90 ? '깔끔한 작업이었어요' : s >= 70 ? '작업 완료' : '작업 완료, 복기가 필요해요';
+    $('r-score').textContent = s;
+    $('r-stars').innerHTML = '★'.repeat(stars) + '<i>' + '★'.repeat(3 - stars) + '</i>';
+    const cnt = (t) => G.pen.filter((p) => p.type === t).length;
+    let stats;
+    if (G.kind === 'yard') {
+      const avg = G.orders.reduce((a, o) => a + o.wait, 0) / G.orders.length;
+      stats = [[G.moves, '이적 횟수'], [fmtTime(avg), '평균 트럭 대기'], [cnt('buryFuture') + cnt('buryCurrent'), '재취급 유발']];
+    } else {
+      const h = heel();
+      stats = [[`${G.loaded}개`, '선적'], [cnt('overstow'), 'Overstow'], [`${Math.abs(h).toFixed(1)}°${Math.abs(h) < 0.05 ? '' : h > 0 ? ' 우현' : ' 좌현'}`, '최종 횡경사']];
+    }
+    $('r-stats').innerHTML = stats.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
+    const types = [...new Set(G.pen.map((p) => p.type))];
+    const items = types.map((t) => {
+      const n = cnt(t), pts = G.pen.filter((p) => p.type === t).reduce((a, p) => a + p.pts, 0);
+      return `<li><b>${PEN[t].name} ×${n} (−${pts}점)</b>${PEN[t].tip}</li>`;
+    });
+    if (!items.length) items.push(G.kind === 'yard'
+      ? '<li class="ok"><b>실수 없음</b>반출 대상 위의 컨테이너만 옮기고, 다음 반출 예정이 없는 열에 이적했어요. 실제 야드에서도 이렇게 하면 재취급과 트럭 대기가 줄어듭니다.</li>'
+      : '<li class="ok"><b>실수 없음</b>양하항 순서와 무게, 균형을 모두 지켰어요. 각 항구에서 restow 없이 바로 하역할 수 있습니다.</li>');
+    $('r-review').innerHTML = items.join('');
+    $('result').hidden = false;
+  }
+
+  // ================= VMT panel =================
+  function renderVMT() {
+    if (!G) return;
+    const v = $('vmt');
+    let h = '';
+    if (G.kind === 'yard') {
+      const o = G.orders[G.oi], tgt = curTarget();
+      const p = tgt && findBox(tgt);
+      h += `<div class="vmt-head"><span>VMT · RTG-07 · 블록 A03 베이 15</span><b>반출 ${Math.min(G.oi + 1, G.orders.length)}/${G.orders.length}</b></div>`;
+      if (o && !o.done) {
+        const where = p ? `위치 <b>${yardLoc(p.r, p.i)}</b> · 위에 ${p.above}개` : '<b>스프레더에 있음</b> → 트럭 차선';
+        h += `<div class="job"><div class="job-label">반출<br>오더</div><div class="job-no">${tgt.no}</div><div class="job-loc">${where} · 트럭 ${o.truck}</div></div>`;
+      } else {
+        h += `<div class="job"><div class="job-label">완료</div><div class="job-no">반출 작업 종료</div><div class="job-loc">모든 트럭이 출발했습니다.</div></div>`;
+      }
+      h += `<div class="msg ${G.msgKind}">${G.msg}</div>`;
+      h += `<div class="bay"><div class="bay-title"><span>베이 단면 · A03-15</span><span>${crane.carrying ? '스프레더: ' + crane.carrying.no : '스프레더: 비어 있음'}</span></div>`;
+      h += `<div class="bay" style="grid-template-columns: 22px repeat(${G.R}, 1fr)">`;
+      for (let t = G.T - 1; t >= 0; t--) {
+        h += `<div class="lbl">${t + 1}</div>`;
+        for (let r = 0; r < G.R; r++) {
+          const b = G.stacks[r][t];
+          if (!b) { h += '<div class="cell"></div>'; continue; }
+          const oi = G.orders.findIndex((x) => x.box === b && !x.done);
+          const cls = ['cell', 'box', b.c === 2 ? 'navy' : '', b === tgt ? 'target' : oi > G.oi ? 'pending' : ''].join(' ');
+          h += `<div class="${cls}">${b.short}${oi >= 0 ? `<sup>${oi + 1}</sup>` : ''}</div>`;
+        }
+      }
+      h += '<div></div>';
+      for (let r = 0; r < G.R; r++) h += `<div class="lbl">${pad2(r + 1)}열</div>`;
+      h += '</div></div>';
+      h += '<div class="chips">' + G.orders.map((x, i) => `<span class="chip ${x.done ? 'done' : i === G.oi ? 'now' : ''}">${i + 1}. ${x.box.short} · ${x.truck}</span>`).join('') + '</div>';
+    } else {
+      h += `<div class="vmt-head"><span>VMT · STS-03 · 베이 13 갑판</span><b>선적 ${G.loaded}/${G.total}</b></div>`;
+      const q = [crane.carrying, ...G.queue].filter(Boolean).slice(0, 3);
+      const podTag = (b) => `<span class="pod" style="background:${PORTS[b.pod].color}">${PORTS[b.pod].code}</span>`;
+      if (q.length) {
+        h += '<div class="queue">' + q.map((b, i) => `<div>${i === 0 ? '현재' : '다음'} ${podTag(b)} ${b.no}${G.cfg.weights ? ` · ${b.w}t` : ''}${b.reefer ? ' · 냉동 22R1' : ''}</div>`).join('') + '</div>';
+      } else h += '<div class="queue"><div>선적 작업 종료</div></div>';
+      h += `<div class="msg ${G.msgKind}">${G.msg}</div>`;
+      h += `<div class="bay"><div class="bay-title"><span>베이 플랜 · 13 갑판</span><span>항로: ${PORTS.slice(0, G.cfg.pods).map((p) => p.name).join(' → ')}</span></div>`;
+      h += `<div class="bay" style="grid-template-columns: 22px repeat(${G.R}, 1fr)">`;
+      for (let t = G.T - 1; t >= 0; t--) {
+        h += `<div class="lbl">${82 + t * 2}</div>`;
+        for (let r = 0; r < G.R; r++) {
+          const b = G.stacks[r][t];
+          const plug = G.plug.includes(r) ? ' plug' : '';
+          h += b ? `<div class="cell${plug}" style="background:${PORTS[b.pod].color};color:#11131a">${PORTS[b.pod].code}${G.cfg.weights ? ' ' + b.w : ''}</div>` : `<div class="cell${plug}"></div>`;
+        }
+      }
+      h += '<div></div>' + G.labels.map((l) => `<div class="lbl">${l}</div>`).join('') + '</div></div>';
+      const hv = heel(), lim = G.cfg.heelLimit || 2;
+      const pos = Math.max(0, Math.min(100, 50 + hv * 8));
+      h += `<div class="gauge"><span>좌현</span><div class="gauge-bar"><em style="left:${50 - lim * 8}%"></em><em style="left:${50 + lim * 8}%"></em><i style="left:${pos}%"></i></div><span>우현</span></div>`;
+      h += `<div class="chips"><span class="chip">횡경사 ${Math.abs(hv).toFixed(1)}°${G.cfg.heelLimit ? ` (한도 ${G.cfg.heelLimit}°)` : ''}</span>${G.plug.length ? '<span class="chip">파란 점선 = 리퍼 플러그 열</span>' : ''}</div>`;
+    }
+    v.innerHTML = h;
+  }
+
+  // ================= drawing =================
+  function roof(cx, cy, w, l, b, alpha = 1) {
+    const x = cx - w / 2, y = cy - l / 2;
+    const [body, rib] = COLORS[b.c];
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = body; ctx.fillRect(x, y, w, l);
+    ctx.fillStyle = rib;
+    for (let yy = y + 5; yy < y + l - 4; yy += 5) ctx.fillRect(x + 3, yy, w - 6, 1.4);
+    ctx.fillStyle = 'rgba(0,0,0,.4)';
+    const k = Math.max(3, w * 0.11);
+    ctx.fillRect(x, y, k, k); ctx.fillRect(x + w - k, y, k, k); ctx.fillRect(x, y + l - k, k, k); ctx.fillRect(x + w - k, y + l - k, k, k);
+    ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, l - 1);
+    if (b.pod != null) {
+      const bh = l * 0.22;
+      ctx.fillStyle = PORTS[b.pod].color; ctx.fillRect(x + 2, y + 2, w - 4, bh);
+      ctx.fillStyle = '#14161c'; ctx.textAlign = 'center';
+      ctx.font = `600 ${Math.max(6.5, w * 0.22)}px "IBM Plex Mono", ui-monospace, monospace`;
+      ctx.fillText(PORTS[b.pod].code, cx, y + 2 + bh * 0.5);
+      if (G && G.cfg.weights) { ctx.font = `600 ${Math.max(6, w * 0.18)}px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillText(`${b.w}t`, cx, y + 2 + bh * 0.92); }
+    }
+    if (b.reefer) {
+      const rh = l * 0.11;
+      ctx.fillStyle = '#e6edf3'; ctx.fillRect(x + 3, y + l - rh - 3, w - 6, rh);
+      ctx.fillStyle = '#2a7bd6'; ctx.textAlign = 'center';
+      ctx.font = `600 ${Math.max(6, w * 0.2)}px "IBM Plex Mono", ui-monospace, monospace`;
+      ctx.fillText('REEFER', cx, y + l - rh * 0.25 - 3);
+    }
+    // ISO roof marking: number runs along the length
+    ctx.save(); ctx.translate(cx, cy + (b.pod != null ? l * 0.08 : 0)); ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = 'rgba(255,255,255,.93)'; ctx.textAlign = 'center';
+    ctx.font = `600 ${Math.max(6, w * 0.17)}px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.fillText(b.no, 0, -w * 0.04);
+    ctx.font = `600 ${Math.max(5.5, w * 0.14)}px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.fillText(b.type, 0, w * 0.24);
+    ctx.restore();
+    ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+  }
+
+  // Higher tiers sit closer to the cab: drawn larger and nudged up-left so lower tiers show at the edge.
+  function tierGeom(cx, cy, i) { const s = 1 + 0.045 * i; return { x: cx - i * 1.5, y: cy - i * 2, w: L.cw * s, l: L.cl * s }; }
+  function drawStack(cx, cy, st, alpha = 1) {
+    if (!st.length) return null;
+    const n = st.length;
+    ctx.globalAlpha = 0.3 * alpha; ctx.fillStyle = '#000';
+    ctx.fillRect(cx - L.cw / 2 + 2 + n * 1.6, cy - L.cl / 2 + 3 + n * 2, L.cw, L.cl);
+    ctx.globalAlpha = 1;
+    let g;
+    for (let i = 0; i < n; i++) {
+      g = tierGeom(cx, cy, i);
+      if (i < n - 1) {
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = COLORS[st[i].c][1]; ctx.fillRect(g.x - g.w / 2, g.y - g.l / 2, g.w, g.l);
+        ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.strokeRect(g.x - g.w / 2 + 0.5, g.y - g.l / 2 + 0.5, g.w - 1, g.l - 1);
+        ctx.globalAlpha = 1;
+      } else roof(g.x, g.y, g.w, g.l, st[i], alpha);
+    }
+    if (alpha === 1) {
+      ctx.fillStyle = '#11131a'; ctx.beginPath(); ctx.arc(g.x - g.w / 2 + 1, g.y - g.l / 2 + 1, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '600 9px "IBM Plex Mono", ui-monospace, monospace'; ctx.textAlign = 'center';
+      ctx.fillText(n, g.x - g.w / 2 + 1, g.y - g.l / 2 + 4.2); ctx.textAlign = 'left';
+    }
+    return g;
+  }
+  function outline(g, color, width = 2.5, padding = 3) {
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.strokeRect(g.x - g.w / 2 - padding, g.y - g.l / 2 - padding, g.w + padding * 2, g.l + padding * 2);
+    ctx.lineWidth = 1;
+  }
+  function slotGeom(r) { return { x: L.rowX[r], y: L.bayY, w: L.cw, l: L.cl }; }
+
+  function drawTruck(cx, cy, b, facingDown) {
+    const w = L.cw, l = L.cl, dir = facingDown ? 1 : -1;
+    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(cx - w / 2 + 3, cy - l / 2 + 4, w, l + w * 0.9);
+    ctx.fillStyle = '#25282e'; ctx.fillRect(cx - w * 0.32, cy - l / 2, w * 0.64, l);
+    ctx.fillStyle = '#111'; for (const yy of [-l / 2 + 4, -l / 2 + 12, l / 2 - 14, l / 2 - 6]) { ctx.fillRect(cx - w / 2 + 1, cy + yy, 5, 6); ctx.fillRect(cx + w / 2 - 6, cy + yy, 5, 6); }
+    const cabY = cy + dir * (l / 2 + 2) + (facingDown ? 0 : -w * 0.78);
+    ctx.fillStyle = '#e9ecef'; ctx.fillRect(cx - w / 2 + 2, cabY, w - 4, w * 0.78);
+    ctx.fillStyle = '#2b3a4a'; ctx.fillRect(cx - w / 2 + 5, cabY + (facingDown ? w * 0.5 : w * 0.06), w - 10, w * 0.2);
+    if (b) roof(cx, cy, w, l, b);
+  }
+
+  function drawYard() {
+    ctx.fillStyle = '#5f6369'; ctx.fillRect(0, 0, LW, LH);
+    // lane
+    const lx = L.laneX - L.colW / 2 - 4, lw = L.colW + 8;
+    ctx.fillStyle = '#54585e'; ctx.fillRect(lx, 0, lw, LH);
+    ctx.fillStyle = '#e7c13d'; ctx.fillRect(lx, 0, 2, LH); ctx.fillRect(lx + lw - 2, 0, 2, LH);
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    for (let y = 0; y < LH; y += 30) ctx.fillRect(L.laneX - 1, y, 2, 14);
+    // slot markings for every bay in view
+    for (let k = -3; k <= 3; k++) {
+      const y = L.bayY + k * L.bayGap;
+      if (y < -L.cl || y > LH + L.cl) continue;
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
+      for (let r = 0; r < G.R; r++) ctx.strokeRect(L.rowX[r] - L.cw / 2 - 3, y - L.cl / 2 - 3, L.cw + 6, L.cl + 6);
+      ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '600 8px "IBM Plex Mono", ui-monospace, monospace';
+      ctx.fillText(`BAY ${15 + k * 2}`, L.rowX[0] - L.cw / 2 - 2, y - L.cl / 2 - 7);
+    }
+    for (const nb of G.neighbors) {
+      const y = L.bayY + nb.k * L.bayGap;
+      nb.stacks.forEach((st, r) => drawStack(L.rowX[r], y, st, 0.5));
     }
   }
 
-  function drawBackground() {
-    const g = ctx.createLinearGradient(0, 0, 0, LH);
-    g.addColorStop(0, '#070d19'); g.addColorStop(1, '#1b2a44');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH);
-    ctx.fillStyle = '#cfd9e8';
-    for (const s of stars) {
-      const y = ((s.y * LH + cam * 0.08) % LH);
-      ctx.globalAlpha = 0.25 + s.r * 0.35; ctx.fillRect(s.x, y, s.r, s.r);
+  function drawShip() {
+    ctx.fillStyle = '#1d4558'; ctx.fillRect(0, 0, LW, LH);
+    ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1;
+    for (let y = 8; y < LH; y += 22) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(LW, y + 6); ctx.stroke(); }
+    // quay apron with truck lane
+    const qx = L.laneX + L.colW / 2 + 5;
+    ctx.fillStyle = '#9a9c9e'; ctx.fillRect(0, 0, qx, LH);
+    ctx.fillStyle = '#86898c'; ctx.fillRect(L.laneX - L.colW / 2 - 2, 0, L.colW + 4, LH);
+    ctx.fillStyle = '#e7c13d'; ctx.fillRect(L.laneX - L.colW / 2 - 2, 0, 2, LH);
+    ctx.fillStyle = '#2b2d30'; ctx.fillRect(qx - 3, 0, 3, LH);
+    ctx.fillStyle = '#e7c13d'; for (let y = 20; y < LH; y += 70) { ctx.beginPath(); ctx.arc(qx - 8, y, 3, 0, Math.PI * 2); ctx.fill(); }
+    // hull
+    const hx = L.rowX[0] - L.colW / 2 - 9, hw = L.rowX[G.R - 1] + L.colW / 2 + 9 - hx;
+    ctx.fillStyle = '#2e3138'; ctx.fillRect(hx - 5, 0, hw + 10, LH);
+    ctx.fillStyle = '#6a6f77'; ctx.fillRect(hx, 0, hw, LH);
+    for (let k = -3; k <= 3; k++) {
+      const y = L.bayY + k * L.bayGap;
+      // hatch cover and lashing bridge
+      ctx.fillStyle = '#7d828a'; ctx.fillRect(hx + 4, y - L.cl / 2 - 8, hw - 8, L.cl + 16);
+      ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.strokeRect(hx + 4.5, y - L.cl / 2 - 7.5, hw - 9, L.cl + 15);
+      ctx.fillStyle = '#4c5057'; ctx.fillRect(hx, y + L.bayGap / 2 - 5, hw, 10);
+      ctx.fillStyle = '#c9a43a'; ctx.fillRect(hx, y + L.bayGap / 2 - 5, hw, 1.5);
+      ctx.fillStyle = 'rgba(255,255,255,.65)'; ctx.font = '600 8px "IBM Plex Mono", ui-monospace, monospace';
+      ctx.fillText(`BAY ${pad2(13 + k * 2)}`, hx + 6, y - L.cl / 2 - 1);
+      if (k === 0) {
+        for (let r = 0; r < G.R; r++) {
+          ctx.strokeStyle = G.plug.includes(r) ? '#5fb3ff' : 'rgba(255,255,255,.4)';
+          ctx.setLineDash(G.plug.includes(r) ? [4, 3] : []);
+          ctx.strokeRect(L.rowX[r] - L.cw / 2 - 3, y - L.cl / 2 - 3, L.cw + 6, L.cl + 6);
+          ctx.setLineDash([]);
+        }
+      }
     }
-    ctx.globalAlpha = 1;
-    // moon
-    ctx.fillStyle = 'rgba(255,236,200,.9)';
-    ctx.beginPath(); ctx.arc(300, 160 + cam * 0.05, 15, 0, Math.PI * 2); ctx.fill();
-
-    // distant terminal skyline (parallax)
-    const horizon = groundY() + cam * 0.3;
-    ctx.fillStyle = '#132038';
-    for (let i = 0; i < 6; i++) {
-      const bx = 10 + i * 64;
-      ctx.fillRect(bx, horizon - 70, 5, 70); ctx.fillRect(bx + 26, horizon - 70, 5, 70);
-      ctx.fillRect(bx - 8, horizon - 74, 52, 6);
-      ctx.fillRect(bx + 30, horizon - 74, 22, 3);
-    }
-    ctx.fillStyle = '#0f1a2e'; ctx.fillRect(0, horizon - 22, LW, 22);
-    for (let i = 0; i < 18; i++) {
-      ctx.fillStyle = i % 3 ? '#16243d' : '#1c2c48';
-      ctx.fillRect(i * 21, horizon - 22 - (i * 37 % 3) * 8, 19, 8 + (i * 37 % 3) * 8);
-    }
-
-    // quay, water, ruler
-    const gy = sy(0);
-    if (gy < LH) {
-      ctx.fillStyle = '#3b4352'; ctx.fillRect(0, gy, LW, 18);
-      ctx.fillStyle = '#2a303b'; ctx.fillRect(0, gy + 18, LW, 6);
-      ctx.fillStyle = '#071226'; ctx.fillRect(0, gy + 24, LW, LH);
-      ctx.fillStyle = 'rgba(255,181,71,.35)';
-      for (let i = 0; i < 9; i++) ctx.fillRect(18 + i * 42, gy + 32 + (i % 3) * 9, 14 + (i % 2) * 8, 1.5);
-    }
-    ctx.fillStyle = 'rgba(159,176,198,.5)';
-    ctx.font = '600 9px "IBM Plex Mono", ui-monospace, monospace';
-    for (let i = 5; i <= stack.length + 8; i += 5) {
-      const y = sy(i * BH + BH);
-      if (y < -10 || y > LH) continue;
-      ctx.fillRect(0, y, 10, 1);
-      ctx.fillText(`${i}`, 13, y + 3);
+    for (const nb of G.neighbors) {
+      const y = L.bayY + nb.k * L.bayGap;
+      nb.stacks.forEach((st, r) => drawStack(L.rowX[r], y, st, 0.45));
     }
   }
 
   function drawCrane() {
-    // gantry girder across the top
-    ctx.fillStyle = '#c9932e'; ctx.fillRect(0, 26, LW, 9);
-    ctx.fillStyle = '#8f6519';
-    for (let i = 0; i < LW; i += 14) ctx.fillRect(i, 28, 2, 6);
-    ctx.fillStyle = '#e8b04a'; ctx.fillRect(0, 26, LW, 1.5);
-    if (!cur) return;
-    const cx = cur.x + cur.w / 2;
-    const cy = sy((stack.length + 1) * BH);
-    ctx.fillStyle = '#3a4250'; ctx.fillRect(cx - 18, 33, 36, 12);
-    ctx.fillStyle = '#ffb547'; ctx.fillRect(cx - 3, 37, 6, 3);
-    ctx.strokeStyle = 'rgba(210,220,232,.7)'; ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(cx - 12, 45); ctx.lineTo(cur.x + cur.w * 0.22, cy - 5);
-    ctx.moveTo(cx + 12, 45); ctx.lineTo(cur.x + cur.w * 0.78, cy - 5);
-    ctx.stroke();
-    ctx.fillStyle = '#e0a83d'; ctx.fillRect(cur.x + 2, cy - 5, cur.w - 4, 5);
+    const yard = G.kind === 'yard';
+    const top = L.bayY - L.cl / 2 - 20, bot = L.bayY + L.cl / 2 + 20;
+    const col = yard ? '#efb52e' : '#5f93bf', dark = yard ? '#a87a12' : '#3c6688';
+    const x0 = 0, x1 = LW;
+    for (const gy of [top, bot]) {
+      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x0 + 4, gy + 4, x1 - x0, 9);
+      ctx.fillStyle = col; ctx.fillRect(x0, gy - 4, x1 - x0, 9);
+      ctx.fillStyle = dark; for (let x = x0; x < x1; x += 12) ctx.fillRect(x, gy - 2, 2, 5);
+    }
+    const legs = yard ? [2, LW - 14] : [2, L.laneX + L.colW / 2 - 6];
+    for (const lx of legs) for (const gy of [top, bot]) {
+      ctx.fillStyle = dark; ctx.fillRect(lx, gy - 14, 12, 28);
+      ctx.fillStyle = '#16171a'; ctx.fillRect(lx + 1, gy - 18, 10, 5); ctx.fillRect(lx + 1, gy + 13, 10, 5);
+    }
+    ctx.fillStyle = '#fff'; ctx.font = '600 8px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.fillText(yard ? 'RTG-07' : 'STS-03', 18, top + 2.5);
+    // row labels under the lower girder
+    ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '600 10px "IBM Plex Mono", ui-monospace, monospace';
+    for (let r = 0; r < G.R; r++) ctx.fillText(yard ? pad2(r + 1) : G.labels[r], L.rowX[r], bot + 20);
+    ctx.fillText('트럭', L.laneX, bot + 20);
+    ctx.textAlign = 'left';
+    // trolley + cab
+    const tx = crane.x;
+    ctx.strokeStyle = dark; ctx.lineWidth = 3;
+    ctx.strokeRect(tx - L.cw / 2 - 9, top - 7, L.cw + 18, bot - top + 14);
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#2b3448'; ctx.fillRect(tx + L.cw / 2 + 2, top - 10, 13, 17);
+    ctx.fillStyle = '#9fd0ff'; ctx.fillRect(tx + L.cw / 2 + 4, top - 2, 9, 5);
+    // spreader / carried box
+    if (crane.carrying) {
+      const s = 1.2;
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(tx - L.cw * s / 2 + 12, L.bayY - L.cl * s / 2 + 15, L.cw * s, L.cl * s);
+      roof(tx, L.bayY, L.cw * s, L.cl * s, crane.carrying);
+      ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2;
+      ctx.strokeRect(tx - L.cw * s / 2 - 2, L.bayY - L.cl * s / 2 - 2, L.cw * s + 4, L.cl * s + 4);
+      ctx.lineWidth = 1;
+    } else {
+      ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2;
+      ctx.strokeRect(tx - L.cw / 2 - 1, L.bayY - L.cl / 2 - 1, L.cw + 2, L.cl + 2);
+      ctx.beginPath(); ctx.moveTo(tx - L.cw / 2, L.bayY); ctx.lineTo(tx + L.cw / 2, L.bayY); ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#ffd34d';
+      for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) ctx.fillRect(tx + dx * L.cw / 2 - 3, L.bayY + dy * L.cl / 2 - 3, 6, 6);
+    }
   }
 
   function draw() {
-    ctx.save();
-    if (shake > 0.05) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
-    drawBackground();
+    if (!G || !L) return;
+    if (G.kind === 'yard') drawYard(); else drawShip();
+    const t = now() / 1000, pulse = 0.55 + 0.45 * Math.sin(t * 5);
 
-    // stack
-    for (let i = 0; i < stack.length; i++) {
-      const b = stack[i];
-      const y = sy((i + 1) * BH);
-      if (y > LH || y < -BH) continue;
-      if (b.base) {
-        ctx.fillStyle = '#4b5361'; ctx.fillRect(b.x, y, b.w, BH);
-        for (let k = 0; k < b.w; k += 16) {
-          ctx.fillStyle = (k / 16) % 2 ? '#1d1f24' : '#e3b23c';
-          ctx.fillRect(b.x + k, y, Math.min(16, b.w - k), 5);
-        }
-        ctx.fillStyle = '#9fb0c6'; ctx.font = '600 9px "IBM Plex Mono", ui-monospace, monospace';
-        ctx.fillText('BAY 03 · ROW 07', b.x + 8, y + 21);
-      } else drawContainer(b.x, y, b.w, b.c, b.no, b.type);
+    // truck in the lane (drawn under the crane)
+    if (truck.state !== 'idle' || truck.box || G.kind === 'yard') {
+      if (!(G.kind === 'yard' && G.done && truck.state === 'idle')) drawTruck(L.laneX, L.bayY + truck.off, truck.box, G.kind === 'yard');
     }
 
-    for (const f of flashes) {
-      const y = sy(f.yW + BH), grow = (1 - f.life) * 8;
-      ctx.strokeStyle = `rgba(255,236,190,${f.life})`; ctx.lineWidth = 2;
-      ctx.strokeRect(f.x - grow, y - grow, f.w + grow * 2, BH + grow * 2);
+    const tops = G.stacks.map((st, r) => drawStack(L.rowX[r], L.bayY, st));
+    if (G.kind === 'yard' && !G.done) {
+      const tgt = curTarget(), p = tgt && findBox(tgt);
+      if (p && G.cfg.hintTarget) outline(tops[p.r], `rgba(255,181,71,${pulse})`, 3, 4);
+      if (G.cfg.hintPlace && crane.carrying && crane.carrying !== tgt) {
+        G.stacks.forEach((st, r) => {
+          if (r === G.src || st.length >= G.T || st.includes(tgt) || st.some(isFuture)) return;
+          outline(tops[r] || slotGeom(r), 'rgba(111,220,156,.9)', 2, 5);
+        });
+      }
+      if (G.cfg.hintTarget && crane.carrying === tgt) outline({ x: L.laneX, y: L.bayY, w: L.cw, l: L.cl }, `rgba(111,220,156,${pulse})`, 3, 6);
+    }
+    if (G.kind === 'ship' && !G.done && G.diff === 'easy') {
+      // beginner hint: rows where the next box causes no overstow
+      const b = crane.carrying || G.queue[0];
+      if (b) G.stacks.forEach((st, r) => { if (st.length < G.T && !st.some((x) => x.pod < b.pod)) outline(tops[r] || slotGeom(r), 'rgba(111,220,156,.75)', 2, 5); });
     }
 
-    if (state === 'play' && cur) {
-      drawCrane();
-      drawContainer(cur.x, sy((stack.length + 1) * BH), cur.w, cur.c, cur.no, cur.type);
-    } else drawCrane();
+    drawCrane();
 
-    for (const d of debris) {
-      ctx.save();
-      ctx.translate(d.x + d.w / 2, sy(d.yW + BH) + BH / 2); ctx.rotate(d.rot);
-      drawContainer(-d.w / 2, -BH / 2, d.w, d.c, d.no, d.type);
-      ctx.restore();
+    ctx.textAlign = 'center'; ctx.font = '16px "Black Han Sans", "Apple SD Gothic Neo", sans-serif';
+    for (const f of G.floats) {
+      ctx.globalAlpha = Math.min(1, f.life * 1.6);
+      ctx.fillStyle = f.kind === 'bad' ? '#ff6b5e' : '#6fdc9c';
+      ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 3;
+      const y = f.y - (1 - f.life) * 26;
+      ctx.strokeText(f.text, f.x, y); ctx.fillText(f.text, f.x, y);
     }
-
-    ctx.textAlign = 'center';
-    ctx.font = '22px "Black Han Sans", "Apple SD Gothic Neo", sans-serif';
-    for (const p of pops) {
-      ctx.fillStyle = `rgba(255,181,71,${Math.min(1, p.life * 1.5)})`;
-      ctx.fillText(p.text, Math.min(LW - 50, Math.max(50, p.x)), sy(p.yW) - 12 - (1 - p.life) * 30);
-    }
-    ctx.textAlign = 'left';
-    ctx.restore();
+    ctx.globalAlpha = 1; ctx.textAlign = 'left'; ctx.lineWidth = 1;
   }
 
-  let last = performance.now();
-  function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  // ================= loop =================
+  function update(dt) {
+    if (!G) return;
+    const step = crane.q[0];
+    if (step) {
+      const d = step.x - crane.x, sp = 520 * dt;
+      if (Math.abs(d) > sp) crane.x += Math.sign(d) * sp;
+      else {
+        crane.x = step.x; step.t += dt;
+        if (step.t > 0.18) { crane.q.shift(); step.cb && step.cb(); }
+      }
+    }
+    if (truck.state !== 'idle') {
+      const sp = 620 * dt;
+      const goal = truck.state === 'in' ? 0 : (G.kind === 'yard' ? LH + L.cl : -LH - L.cl);
+      const d = goal - truck.off;
+      if (Math.abs(d) > sp) truck.off += Math.sign(d) * sp;
+      else { truck.off = goal; truck.state = 'idle'; const cb = truck.cb; truck.cb = null; cb && cb(); }
+    }
+    for (const f of G.floats) f.life -= dt * 0.8;
+    G.floats = G.floats.filter((f) => f.life > 0);
+    // HUD clock
+    if (!G.done) {
+      const s = G.kind === 'yard' ? (now() - G.truckT0) / 1000 : (now() - G.t0) / 1000;
+      const txt = fmtTime(s);
+      if ($('hud-time').textContent !== txt) $('hud-time').textContent = txt;
+      $('hud-time-wrap').classList.toggle('late', G.kind === 'yard' && !!G.cfg.waitLimit && s > G.cfg.waitLimit);
+    }
+  }
+  let last = now();
+  function frame(t) {
+    const dt = Math.min(0.05, (t - last) / 1000); last = t;
     update(dt); draw();
     requestAnimationFrame(frame);
   }
 
-  function boot(data) {
-    if (data && data.bests) for (const k in bests) bests[k] = Math.max(bests[k], data.bests[k] || 0);
-    resize(); setMode(mode);
-    requestAnimationFrame(frame);
+  // ================= input =================
+  function tap(col) {
+    if (!G || G.done || busy() || col == null) return;
+    if (G.kind === 'yard') yardTap(col); else shipTap(col);
   }
-  window.claude?.hot?.snapshot?.(() => ({ bests }));
-  window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
+  cvs.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const r = cvs.getBoundingClientRect();
+    tap(hitCol((e.clientX - r.left) / scale));
+  });
+  addEventListener('keydown', (e) => {
+    if (!G || !$('home').hidden || !$('result').hidden) return;
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= G.R) tap(n - 1);
+    else if (e.key === 't' || e.key === 'T' || e.key === '0') tap('lane');
+  });
+  addEventListener('resize', resize);
+
+  // ================= home screen =================
+  function renderHome() {
+    for (const b of document.querySelectorAll('.mode')) b.setAttribute('aria-pressed', String(b.dataset.game === sel.game));
+    for (const b of document.querySelectorAll('.diff')) b.setAttribute('aria-pressed', String(b.dataset.diff === sel.diff));
+    $('diff-desc').textContent = (sel.game === 'yard' ? YARD : SHIP)[sel.diff].desc;
+    const best = store.get(bestKey(sel.game, sel.diff));
+    $('home-best').innerHTML = best ? `이 작업·난이도 최고 점수 <b>${best}점</b>` : '아직 기록이 없습니다.';
+  }
+  for (const b of document.querySelectorAll('.mode')) b.addEventListener('click', () => { sel.game = b.dataset.game; store.set('edu-game', sel.game); renderHome(); });
+  for (const b of document.querySelectorAll('.diff')) b.addEventListener('click', () => { sel.diff = b.dataset.diff; store.set('edu-diff', sel.diff); renderHome(); });
+  $('go').addEventListener('click', startGame);
+  $('again').addEventListener('click', startGame);
+  const goHome = () => { $('result').hidden = true; $('home').hidden = false; renderHome(); };
+  $('r-home').addEventListener('click', goHome);
+  $('back').addEventListener('click', goHome);
+
+  renderHome();
+  // Draw a live yard behind the home screen so the first frame is never empty.
+  startGame(); $('home').hidden = false;
+  requestAnimationFrame(frame);
 })();
 </script>
 </body>
